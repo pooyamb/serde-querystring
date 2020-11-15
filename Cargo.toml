@@ -34,5 +34,9 @@ harness = false
 name = "multilevel"
 harness = false
 
+[[bench]]
+name = "seq"
+harness = false
+
 [profile.bench]
 lto = true
