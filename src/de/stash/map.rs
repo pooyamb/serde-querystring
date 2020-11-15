@@ -86,6 +86,7 @@ impl<'de> PairMap<'de> {
             values.push(self.next_value()?);
         }
 
+        // TODO: support ordered sequence
         let mut pairs = vec![];
         while let Some(key) = self.stash.next_key()? {
             let mut map = self.stash.next_value_map()?;
@@ -98,7 +99,7 @@ impl<'de> PairMap<'de> {
                 pairs.push(map)
             }
         }
-        Ok(PairSeq::new(values, pairs))
+        Ok(PairSeq::new(values, pairs, self.stash.remaining_depth))
     }
 }
 
