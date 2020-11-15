@@ -275,6 +275,12 @@ impl<'de> de::SeqAccess<'de> for Deserializer<'de> {
         // TODO: it may make sense to do boundary check here
         self.parser.index = index + 1;
 
+        let remaining_depth = if self.remaining_depth > 1 {
+            self.remaining_depth - 1
+        } else {
+            0
+        };
+
         seed.deserialize(&mut Deserializer::new_with_depth(
             slice,
             self.remaining_depth - 1,

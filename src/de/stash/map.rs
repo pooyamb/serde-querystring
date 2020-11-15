@@ -2,7 +2,10 @@ use std::collections::VecDeque;
 
 use serde::{de, forward_to_deserialize_any};
 
-use super::{seq::PairSeq, Pair, Stash};
+use super::{
+    seq::{ItemKind, PairSeq},
+    Pair, Stash,
+};
 use crate::de::Deserializer;
 use crate::error::{Error, Result};
 
@@ -93,25 +96,47 @@ impl<'de> PairMap<'de> {
     }
 
     pub(crate) fn into_seq(mut self) -> Result<PairSeq<'de>> {
-        let mut values = VecDeque::new();
-        while let Some(_) = self.next_key()? {
-            values.push_front(self.next_value()?);
+        let mut items = vec![];
+
+        // Pushing all pairs with empty keys as sequence values
+        while let Some(key) = self.next_key()? {
+            if let Ok(index) = crate::from_bytes::<u16>(key) {
+                items.push((index as isize, ItemKind::Value(self.next_value()?)));
+            } else {
+                items.push((-1, ItemKind::Value(self.next_value()?)));
+            }
         }
 
+        // Pushing all pairs with non-empty keys as sequence sub maps
         // TODO: support ordered sequence
-        let mut pairs = VecDeque::new();
         while let Some(key) = self.stash.next_key()? {
             let mut map = self.stash.next_value_map()?;
             if key.is_empty() {
-                // We should check the key
+                // We don't support anything but raw values for empty keys
+                // so we visit them one by one seprately
                 while let Some(pair) = map.pairs.pop_back() {
-                    pairs.push_front(PairMap::with_one_pair(10, pair));
+                    items.push((
+                        -1,
+                        ItemKind::Map(PairMap::with_one_pair(self.stash.remaining_depth - 1, pair)),
+                    ));
                 }
             } else {
-                pairs.push_front(map)
+                // Keys may be a group name in unordered sequence, or numbers for ordered ones
+                // so we should check that
+                if let Ok(index) = crate::from_bytes::<u16>(key) {
+                    items.push((index as isize, ItemKind::Map(map)));
+                } else {
+                    items.push((-1, ItemKind::Map(map)));
+                }
             }
         }
-        Ok(PairSeq::new(values, pairs, self.stash.remaining_depth))
+
+        // Order the items by their keys
+        items.sort_by_key(|item| item.0);
+        items.reverse();
+        let items = items.into_iter().map(|item| item.1).collect();
+
+        Ok(PairSeq::new(items, self.stash.remaining_depth))
     }
 }
 
@@ -257,10 +282,10 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
         V: de::Visitor<'de>,
     {
         match self.next_value() {
-            Ok(value) => visitor.visit_seq(&mut Deserializer::new_with_depth(
-                value,
-                self.stash.remaining_depth - 1,
-            )),
+            Ok(value) => {
+                let mut de = Deserializer::new_with_depth(value, self.stash.remaining_depth - 1);
+                serde::de::Deserializer::deserialize_seq(&mut de, visitor)
+            }
             _ => visitor.visit_seq(&mut self.stash.next_value_map()?.into_seq()?),
         }
     }

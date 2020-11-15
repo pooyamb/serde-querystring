@@ -8,8 +8,6 @@ pub(crate) enum ReaderNumber {
     F64(f64),
     U64(u64),
     I64(i64),
-    #[cfg(feature = "arbitrary_precision")]
-    String(String),
 }
 
 impl ReaderNumber {
