@@ -553,7 +553,7 @@ fn deserialize_enum_in_map() {
 }
 
 #[test]
-fn deserialize_enum_in_seq() {
+fn deserialize_enums() {
     // from rust by example book
     #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
     enum Event {
@@ -564,6 +564,39 @@ fn deserialize_enum_in_seq() {
         Click { x: i64, y: i64 },
         Missed(i32, i32),
     }
+
+    // deserialize to enum itself
+    // unit
+    assert_eq!(
+        serde_querystring::from_str::<Event>("PageUnload"),
+        Ok(PageUnload)
+    );
+
+    // sequence
+    assert_eq!(
+        serde_querystring::from_str::<Event>("Missed=400,640"),
+        Ok(Event::Missed(400, 640))
+    );
+    assert_eq!(
+        serde_querystring::from_str::<Event>("Missed[]=400&Missed[]=640"),
+        Ok(Event::Missed(400, 640))
+    );
+    assert_eq!(
+        serde_querystring::from_str::<Event>("Missed[1]=640&Missed[0]=400"),
+        Ok(Event::Missed(400, 640))
+    );
+
+    // struct
+    assert_eq!(
+        serde_querystring::from_str::<Event>("Click[x]=100&Click[y]=240"),
+        Ok(Event::Click { x: 100, y: 240 })
+    );
+
+    // new type
+    assert_eq!(
+        serde_querystring::from_str::<Event>("KeyPress=X"),
+        Ok(Event::KeyPress('X'))
+    );
 
     use Event::*;
 
@@ -585,6 +618,8 @@ fn deserialize_enum_in_seq() {
             events: vec![PageLoad, PageUnload]
         })
     );
+
+    // struct and tuple enums
     assert_eq!(
         serde_querystring::from_str::<A>(
             "events[][Paste]=asd&events[][Missed]=1200,2400\
@@ -599,9 +634,15 @@ fn deserialize_enum_in_seq() {
         })
     );
     assert_eq!(
-        serde_querystring::from_str::<A>("events[][Missed]=1200,2400&events[][Paste]=asd"),
+        serde_querystring::from_str::<A>(
+            "events[][Missed]=1200,2400&events[][Missed]=1200,2400&events[][Paste]=asd"
+        ),
         Ok(A {
-            events: vec![Missed(1200, 2400), Paste("asd".to_string())]
+            events: vec![
+                Missed(1200, 2400),
+                Missed(1200, 2400),
+                Paste("asd".to_string())
+            ]
         })
     );
 }
@@ -666,33 +707,6 @@ fn deserialize_sequence_key() {
         Cold,
     }
 
-    assert_eq!(
-        serde_querystring::from_str::<Weather>("Rainy[1]=h&Rainy[1]=v"),
-        Ok(Weather::Rainy('h', 'v'))
-    );
-    assert_eq!(
-        serde_querystring::from_str::<Weather>("Rainy=h,v"),
-        Ok(Weather::Rainy('h', 'v'))
-    );
-
-    assert_eq!(
-        serde_querystring::from_str::<Weather>("Sunny[uv]=300&Sunny[tempt]=3500"),
-        Ok(Weather::Sunny {
-            uv: 300,
-            tempt: 3500
-        })
-    );
-
-    assert_eq!(
-        serde_querystring::from_str::<Weather>("Cold"),
-        Ok(Weather::Cold)
-    );
-
-    assert_eq!(
-        serde_querystring::from_str::<Weather>("Hot=10"),
-        Ok(Weather::Hot(10))
-    );
-
     #[derive(Debug, Deserialize, PartialEq)]
     struct City {
         history: Vec<Weather>,
@@ -711,4 +725,33 @@ fn deserialize_sequence_key() {
             Weather::Rainy('k', 'o'),
         ] })
     );
+}
+
+#[test]
+fn deserialize_sequence_key_ordered() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct A {
+        x: Vec<i32>,
+    }
+
+    assert_eq!(
+        serde_querystring::from_str::<A>(
+            "x[10]=9&x[10]=10&x[1]=2&x[8]=8&x[2]=3&x[6]=7&x[0]=1&x[]=0"
+        ),
+        Ok(A {
+            x: vec![0, 1, 2, 3, 7, 8, 9, 10]
+        })
+    );
+
+    // Should add tests for cases with sub keys
+}
+
+#[test]
+fn deserialize_invalid() {
+    // serde_querystring::from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
+}
+
+#[test]
+fn deserialize_to_unit() {
+    // serde_querystring::from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
 }
