@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use crate::error::{Error, Result};
 
@@ -14,8 +14,8 @@ pub(crate) struct Pair<'de> {
 }
 
 pub(crate) struct Stash<'de> {
-    keys: BTreeMap<&'de [u8], Vec<Pair<'de>>>,
-    values: Option<Vec<Pair<'de>>>,
+    keys: BTreeMap<&'de [u8], VecDeque<Pair<'de>>>,
+    values: Option<VecDeque<Pair<'de>>>,
     pub(crate) remaining_depth: u16,
 }
 
@@ -32,9 +32,11 @@ impl<'de> Stash<'de> {
 
     pub(crate) fn add(&mut self, parent: &'de [u8], key: &'de [u8], value: &'de [u8]) {
         if let Some(pairs) = self.keys.get_mut(parent) {
-            pairs.push(Pair { key, value });
+            pairs.push_front(Pair { key, value });
         } else {
-            self.keys.insert(parent, vec![Pair { key, value }]);
+            let mut pairs = VecDeque::new();
+            pairs.push_front(Pair { key, value });
+            self.keys.insert(parent, pairs);
         }
     }
 

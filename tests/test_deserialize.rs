@@ -592,16 +592,16 @@ fn deserialize_enum_in_seq() {
         ),
         Ok(A {
             events: vec![
-                Click { x: 5500, y: 6900 },
-                Missed(1200, 2400),
                 Paste("asd".to_string()),
+                Missed(1200, 2400),
+                Click { x: 5500, y: 6900 },
             ]
         })
     );
     assert_eq!(
         serde_querystring::from_str::<A>("events[][Missed]=1200,2400&events[][Paste]=asd"),
         Ok(A {
-            events: vec![Paste("asd".to_string()), Missed(1200, 2400)]
+            events: vec![Missed(1200, 2400), Paste("asd".to_string())]
         })
     );
 }
@@ -640,7 +640,7 @@ fn deserialize_sequence_key() {
         ),
         Ok(Country {
             sun: UvRate {
-                nums: vec![1337, 3, 1],
+                nums: vec![1, 3, 1337],
                 average: 447
             }
         })
@@ -652,7 +652,7 @@ fn deserialize_sequence_key() {
         ),
         Ok(Country {
             sun: UvRate {
-                nums: vec![1337, 2, 1],
+                nums: vec![1, 2, 1337],
                 average: 300
             }
         })
@@ -704,10 +704,11 @@ fn deserialize_sequence_key() {
             history[3][Hot]=10&history[4][Rainy][]=k&history[4][Rainy][]=o"
         ),
         Ok(City { history: vec![
-            Weather::Cold, Weather::Rainy('k', 'o'),
-            Weather::Hot(10),
+            Weather::Cold,
+            Weather::Rainy('a', 'b'),
             Weather::Sunny { uv: 100, tempt: 100 },
-            Weather::Rainy('a', 'b')
+            Weather::Hot(10),
+            Weather::Rainy('k', 'o'),
         ] })
     );
 }

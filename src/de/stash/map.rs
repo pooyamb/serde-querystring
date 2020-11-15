@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use serde::{de, forward_to_deserialize_any};
 
 use super::{seq::PairSeq, Pair, Stash};
@@ -5,13 +7,23 @@ use crate::de::Deserializer;
 use crate::error::{Error, Result};
 
 pub(crate) struct PairMap<'de> {
-    pairs: Vec<Pair<'de>>,
+    pairs: VecDeque<Pair<'de>>,
     value: Option<&'de [u8]>,
     stash: Stash<'de>,
 }
 
 impl<'de> PairMap<'de> {
-    pub(crate) fn new(depth: u16, pairs: Vec<Pair<'de>>) -> Self {
+    pub(crate) fn new(depth: u16, pairs: VecDeque<Pair<'de>>) -> Self {
+        Self {
+            pairs,
+            value: None,
+            stash: Stash::new(depth),
+        }
+    }
+
+    pub(crate) fn with_one_pair(depth: u16, pair: Pair<'de>) -> Self {
+        let mut pairs = VecDeque::new();
+        pairs.push_front(pair);
         Self {
             pairs,
             value: None,
@@ -59,7 +71,7 @@ impl<'de> PairMap<'de> {
 
     pub(crate) fn next_key(&mut self) -> Result<Option<&'de [u8]>> {
         loop {
-            match self.pairs.pop() {
+            match self.pairs.pop_back() {
                 Some(pair) => match self.parse_pair(pair)? {
                     Some(key) => {
                         return Ok(Some(key));
@@ -81,22 +93,22 @@ impl<'de> PairMap<'de> {
     }
 
     pub(crate) fn into_seq(mut self) -> Result<PairSeq<'de>> {
-        let mut values = vec![];
+        let mut values = VecDeque::new();
         while let Some(_) = self.next_key()? {
-            values.push(self.next_value()?);
+            values.push_front(self.next_value()?);
         }
 
         // TODO: support ordered sequence
-        let mut pairs = vec![];
+        let mut pairs = VecDeque::new();
         while let Some(key) = self.stash.next_key()? {
             let mut map = self.stash.next_value_map()?;
             if key.is_empty() {
                 // We should check the key
-                while let Some(pair) = map.pairs.pop() {
-                    pairs.push(PairMap::new(10, vec![pair]));
+                while let Some(pair) = map.pairs.pop_back() {
+                    pairs.push_front(PairMap::with_one_pair(10, pair));
                 }
             } else {
-                pairs.push(map)
+                pairs.push_front(map)
             }
         }
         Ok(PairSeq::new(values, pairs, self.stash.remaining_depth))
