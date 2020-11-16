@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 
 use crate::error::{Error, Result};
 
@@ -14,7 +14,7 @@ pub(crate) struct Pair<'de> {
 }
 
 pub(crate) struct Stash<'de> {
-    keys: BTreeMap<&'de [u8], VecDeque<Pair<'de>>>,
+    pairs: VecDeque<(&'de [u8], VecDeque<Pair<'de>>)>,
     values: Option<VecDeque<Pair<'de>>>,
     pub(crate) remaining_depth: u16,
 }
@@ -24,19 +24,19 @@ impl<'de> Stash<'de> {
         // We also store remaining_depth here as we may go independent of main deserializer
         // from here
         Self {
-            keys: BTreeMap::default(),
+            pairs: VecDeque::new(),
             values: None,
             remaining_depth,
         }
     }
 
     pub(crate) fn add(&mut self, parent: &'de [u8], key: &'de [u8], value: &'de [u8]) {
-        if let Some(pairs) = self.keys.get_mut(parent) {
+        if let Some((_, pairs)) = self.pairs.iter_mut().find(|item| item.0 == parent) {
             pairs.push_front(Pair { key, value });
         } else {
             let mut pairs = VecDeque::new();
             pairs.push_front(Pair { key, value });
-            self.keys.insert(parent, pairs);
+            self.pairs.push_front((parent, pairs));
         }
     }
 
@@ -46,18 +46,11 @@ impl<'de> Stash<'de> {
             return Err(Error::MaximumDepthReached);
         }
 
-        // TODO: should look for a better alternative
-        let parent: &[u8] = match self.keys.keys().take(1).collect::<Vec<&&[u8]>>().pop() {
-            None => return Ok(None),
-            Some(parent) => *parent,
-        };
-
-        match self.keys.remove_entry(parent) {
-            Some((parent, pair)) => {
-                self.values = Some(pair);
-                Ok(Some(parent))
-            }
-            None => Ok(None),
+        if let Some((parent, pairs)) = self.pairs.pop_back() {
+            self.values = Some(pairs);
+            Ok(Some(parent))
+        } else {
+            Ok(None)
         }
     }
 
