@@ -24,17 +24,12 @@ impl<'de> PairMap<'de> {
         }
     }
 
-    pub(crate) fn with_one_pair(depth: u16, pair: Pair<'de>) -> Self {
-        let mut pairs = VecDeque::new();
-        pairs.push_front(pair);
-        Self {
-            pairs,
-            value: None,
-            stash: Stash::new(depth),
-        }
+    pub(crate) fn prepend(&mut self, mut pairs: VecDeque<Pair<'de>>) {
+        pairs.append(&mut self.pairs);
+        self.pairs = pairs;
     }
 
-    pub(crate) fn parse_pair(&mut self, pair: Pair<'de>) -> Result<Option<&'de [u8]>> {
+    pub(crate) fn parse_pair(&mut self, pair: Pair<'de>) -> Result<Option<(&'de [u8], &'de [u8])>> {
         // Parse key
         let mut key_index = 0;
         let mut key_found = false;
@@ -67,25 +62,23 @@ impl<'de> PairMap<'de> {
                 Err(Error::InvalidMapKey)
             }
         } else {
-            self.value = Some(pair.value);
-            Ok(Some(&pair.key[0..key_index]))
+            Ok(Some((&pair.key[0..key_index], pair.value)))
         }
     }
 
     pub(crate) fn next_key(&mut self) -> Result<Option<&'de [u8]>> {
-        loop {
-            match self.pairs.pop_back() {
-                Some(pair) => match self.parse_pair(pair)? {
-                    Some(key) => {
-                        return Ok(Some(key));
-                    }
-                    None => {
-                        continue;
-                    }
-                },
-                None => return Ok(None),
+        while let Some(pair) = self.pairs.pop_back() {
+            match self.parse_pair(pair)? {
+                Some((key, value)) => {
+                    self.value = Some(value);
+                    return Ok(Some(key));
+                }
+                None => {
+                    continue;
+                }
             }
         }
+        Ok(None)
     }
 
     pub(crate) fn next_value(&mut self) -> Result<&'de [u8]> {
@@ -95,48 +88,57 @@ impl<'de> PairMap<'de> {
         }
     }
 
-    pub(crate) fn into_seq(mut self) -> Result<PairSeq<'de>> {
-        let mut items = vec![];
-
-        // Pushing all pairs with empty keys as sequence values
-        while let Some(key) = self.next_key()? {
-            if let Ok(index) = crate::from_bytes::<u16>(key) {
-                items.push((index as isize, ItemKind::Value(self.next_value()?)));
-            } else {
-                items.push((-1, ItemKind::Value(self.next_value()?)));
+    // TODO: this is overcomplicated, look for an easier way
+    pub(crate) fn into_pairs(mut self) -> Result<Vec<(&'de [u8], ItemKind<'de>)>> {
+        let mut values = vec![];
+        while let Some(pair) = self.pairs.pop_back() {
+            if let Some((key, value)) = self.parse_pair(pair)? {
+                // If it is in current level just add it as a single value
+                values.push((key, ItemKind::Value(value)));
+            } else if let Some(key) = self.stash.next_key()? {
+                // Visit the stash
+                if key.is_empty() {
+                    // If key is empty, then add it as a single map
+                    values.push((key, ItemKind::Map(self.stash.next_value_map()?)));
+                } else if let Some((_, item)) = values.iter_mut().find(|item| item.0 == key) {
+                    // If we already saw the key and it was a map, combine it with the previous map
+                    // If it was a single value, just ignore this one
+                    if let ItemKind::Map(map) = item {
+                        map.prepend(self.stash.next_value()?)
+                    }
+                } else {
+                    values.push((key, ItemKind::Map(self.stash.next_value_map()?)));
+                }
             }
         }
+        Ok(values)
+    }
 
-        // Pushing all pairs with non-empty keys as sequence sub maps
-        // TODO: support ordered sequence
-        while let Some(key) = self.stash.next_key()? {
-            let mut map = self.stash.next_value_map()?;
-            if key.is_empty() {
-                // We don't support anything but raw values for empty keys
-                // so we visit them one by one seprately
-                while let Some(pair) = map.pairs.pop_back() {
-                    items.push((
-                        -1,
-                        ItemKind::Map(PairMap::with_one_pair(self.stash.remaining_depth - 1, pair)),
-                    ));
-                }
+    pub(crate) fn into_seq(self) -> Result<PairSeq<'de>> {
+        let remaining_depth = self.stash.remaining_depth;
+
+        let pairs = self.into_pairs()?;
+        let mut items = vec![];
+        let mut sorted_items = vec![];
+
+        for (key, value) in pairs {
+            if let Ok(index) = crate::from_bytes::<u16>(key) {
+                sorted_items.push((index as isize, value));
             } else {
-                // Keys may be a group name in unordered sequence, or numbers for ordered ones
-                // so we should check that
-                if let Ok(index) = crate::from_bytes::<u16>(key) {
-                    items.push((index as isize, ItemKind::Map(map)));
-                } else {
-                    items.push((-1, ItemKind::Map(map)));
-                }
+                items.push((-1, value));
             }
         }
 
         // Order the items by their keys
-        items.sort_by_key(|item| item.0);
+        // TODO: this is overcomplicated, look for an easier way
+        sorted_items.sort_by_key(|item| item.0);
+        sorted_items.dedup_by_key(|item| item.0);
+        items.append(&mut sorted_items);
         items.reverse();
+
         let items = items.into_iter().map(|item| item.1).collect();
 
-        Ok(PairSeq::new(items, self.stash.remaining_depth))
+        Ok(PairSeq::new(items, remaining_depth))
     }
 }
 

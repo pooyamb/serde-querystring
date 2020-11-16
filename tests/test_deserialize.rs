@@ -739,11 +739,30 @@ fn deserialize_sequence_key_ordered() {
             "x[10]=9&x[10]=10&x[1]=2&x[8]=8&x[2]=3&x[6]=7&x[0]=1&x[]=0"
         ),
         Ok(A {
-            x: vec![0, 1, 2, 3, 7, 8, 9, 10]
+            x: vec![0, 1, 2, 3, 7, 8, 9]
         })
     );
 
-    // Should add tests for cases with sub keys
+    #[derive(Debug, Deserialize, PartialEq)]
+    enum Anum {
+        Q,
+        W(i32),
+        E(i32, i32),
+        R { x: i32, y: i32 },
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct X {
+        a: Vec<Anum>,
+    }
+
+    // Keyed sequences are first come first serve
+    assert_eq!(
+        serde_querystring::from_str::<X>("a[1][E][]=1&a[1][R][y]=2&a[1][E][]=2&a[1][R][x]=1"),
+        Ok(X {
+            a: vec![Anum::E(1, 2)]
+        })
+    );
 }
 
 #[test]

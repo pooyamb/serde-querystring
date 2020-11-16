@@ -54,6 +54,13 @@ impl<'de> Stash<'de> {
         }
     }
 
+    pub(crate) fn next_value(&mut self) -> Result<VecDeque<Pair<'de>>> {
+        match self.values.take() {
+            None => Err(Error::EofReached),
+            Some(pairs) => Ok(pairs),
+        }
+    }
+
     pub(crate) fn next_value_map(&mut self) -> Result<PairMap<'de>> {
         match self.values.take() {
             None => Err(Error::EofReached),
