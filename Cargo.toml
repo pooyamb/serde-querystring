@@ -1,6 +1,6 @@
 [package]
 name = "serde-querystring"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Pouya M. B. <pooyamb@gmail.com>"]
 description = "A query string deserializer based on serde"
 edition = "2018"
