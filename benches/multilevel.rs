@@ -1,49 +1,46 @@
+use std::error::Error;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use serde::Deserialize;
 
-#[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Level4 {
     x4: String,
     y4: String,
     z4: String,
 }
-#[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Level3 {
     x3: Level4,
     y3: Level4,
     z3: Level4,
 }
-#[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Level2 {
     x2: Level3,
     y2: Level3,
     z2: Level3,
 }
-#[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Level1 {
     x1: Level2,
     y1: Level2,
     z1: Level2,
 }
 
-#[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Sample {
     x0: Level1,
     y0: Level1,
     z0: Level1,
 }
 
-fn serde_querystring(input: &str) {
-    serde_querystring::from_str::<Sample>(input).unwrap();
+fn serde_querystring(input: &str) -> Result<Sample, impl Error> {
+    serde_querystring::from_str::<Sample>(input)
 }
 
-fn serde_qs(input: &str) {
-    serde_qs::from_str::<Sample>(input).unwrap();
+fn serde_qs(input: &str) -> Result<Sample, impl Error> {
+    serde_qs::from_str::<Sample>(input)
 }
 
 fn ordered(c: &mut Criterion) {
@@ -108,6 +105,13 @@ fn ordered(c: &mut Criterion) {
     &z0[z1][y2][z3][x4]=1&z0[z1][y2][z3][y4]=2&z0[z1][y2][z3][z4]=3&z0[z1][z2][x3][x4]=1\
     &z0[z1][z2][x3][y4]=2&z0[z1][z2][x3][z4]=3&z0[z1][z2][y3][x4]=1&z0[z1][z2][y3][y4]=2\
     &z0[z1][z2][y3][z4]=3&z0[z1][z2][z3][x4]=1&z0[z1][z2][z3][y4]=2&z0[z1][z2][z3][z4]=3";
+
+    // Check if everything is working as expected
+    assert_eq!(
+        serde_querystring(ordered).unwrap(),
+        serde_qs(ordered).unwrap()
+    );
+
     c.bench_function("many level child ordered querystring", |b| {
         b.iter(|| serde_querystring(ordered))
     });
@@ -178,6 +182,13 @@ fn unordered(c: &mut Criterion) {
     &x0[x1][y2][x3][z4]=3&x0[x1][y2][x3][y4]=2&x0[x1][y2][x3][x4]=1&x0[x1][x2][z3][z4]=3\
     &x0[x1][x2][z3][y4]=2&x0[x1][x2][z3][x4]=1&x0[x1][x2][y3][z4]=3&x0[x1][x2][y3][y4]=2\
     &x0[x1][x2][y3][x4]=1&x0[x1][x2][x3][z4]=3&x0[x1][x2][x3][y4]=2&x0[x1][x2][x3][x4]=1";
+
+    // Check if everything is working as expected
+    assert_eq!(
+        serde_querystring(unordered).unwrap(),
+        serde_qs(unordered).unwrap()
+    );
+
     c.bench_function("many level child unordered querystring", |b| {
         b.iter(|| serde_querystring(unordered))
     });
