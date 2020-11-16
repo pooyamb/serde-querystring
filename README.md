@@ -7,7 +7,7 @@ An alternative query string parser based on serde for rust.
 ```toml
 # Cargo.toml
 [dependencies]
-serde-querystring = "0.0.1"
+serde-querystring = "0.0.2"
 ```
 
 ## Usage
