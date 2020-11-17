@@ -2,7 +2,7 @@ use serde::de;
 use serde::de::IntoDeserializer;
 
 use super::stash::Stash;
-use super::Deserializer;
+use super::{Deserializer, Value};
 use crate::error::{Error, Result};
 
 pub(crate) struct MapEntry<'de, 'a> {
@@ -14,7 +14,7 @@ pub(crate) struct MapEntry<'de, 'a> {
 impl<'de, 'a> MapEntry<'de, 'a> {
     pub(crate) fn new(de: &'a mut Deserializer<'de>) -> Self {
         Self {
-            stash: Stash::new(de.remaining_depth - 1),
+            stash: Stash::new(64),
             value: None,
             de,
         }
@@ -122,17 +122,14 @@ impl<'de, 'a> de::MapAccess<'de> for MapEntry<'de, 'a> {
         if !self.de.parser.done() {
             let key = self.parse_pair()?;
             if let Some(key) = key {
-                return seed.deserialize(&mut Deserializer::new(key)).map(Some);
+                return seed.deserialize(&mut Value::new(key)).map(Some);
             }
         }
 
         // Visit stash
         let key = self.stash.next_key()?;
         match key {
-            Some(key) => {
-                let mut de = Deserializer::new(&key);
-                seed.deserialize(&mut de).map(Some)
-            }
+            Some(key) => seed.deserialize(&mut Value::new(key)).map(Some),
             None => Ok(None),
         }
     }
@@ -142,10 +139,7 @@ impl<'de, 'a> de::MapAccess<'de> for MapEntry<'de, 'a> {
         V: de::DeserializeSeed<'de>,
     {
         match self.value.take() {
-            Some(value) => {
-                let mut de = Deserializer::new_with_depth(value, self.de.remaining_depth - 1);
-                seed.deserialize(&mut de)
-            }
+            Some(value) => seed.deserialize(&mut Value::new(value)),
             None => seed.deserialize(self.stash.next_value_map()?),
         }
     }
@@ -163,7 +157,7 @@ impl<'de, 'a> de::EnumAccess<'de> for MapEntry<'de, 'a> {
         if !self.de.parser.done() {
             if let Some(key) = self.parse_pair()? {
                 return seed
-                    .deserialize(&mut Deserializer::new(key))
+                    .deserialize(&mut Value::new(&key))
                     .map(|res| (res, self));
             }
         }
@@ -171,10 +165,9 @@ impl<'de, 'a> de::EnumAccess<'de> for MapEntry<'de, 'a> {
         // Visit stash
         let key = self.stash.next_key()?;
         match key {
-            Some(key) => {
-                let mut de = Deserializer::new(&key);
-                seed.deserialize(&mut de).map(|res| (res, self))
-            }
+            Some(key) => seed
+                .deserialize(&mut Value::new(&key))
+                .map(|res| (res, self)),
             None => {
                 // Just visit one single token if available, it is here to cover enum unit values
                 let key = std::str::from_utf8(self.de.parser.parse_token()?)
@@ -199,7 +192,7 @@ impl<'de, 'a> de::VariantAccess<'de> for MapEntry<'de, 'a> {
     {
         match self.value.take() {
             Some(value) => {
-                let mut de = Deserializer::new_with_depth(value, self.de.remaining_depth - 1);
+                let mut de = Value::new(value);
                 visitor.visit_seq(&mut de)
             }
             None => visitor.visit_seq(self.stash.next_value_map()?.into_seq()?),
@@ -220,10 +213,7 @@ impl<'de, 'a> de::VariantAccess<'de> for MapEntry<'de, 'a> {
         T: de::DeserializeSeed<'de>,
     {
         match self.value.take() {
-            Some(value) => {
-                let mut de = Deserializer::new_with_depth(value, self.de.remaining_depth - 1);
-                seed.deserialize(&mut de)
-            }
+            Some(value) => seed.deserialize(&mut Value::new(value)),
             None => seed.deserialize(self.stash.next_value_map()?),
         }
     }

@@ -1,7 +1,7 @@
 use serde::de;
 
 use super::map::PairMap;
-use crate::de::Deserializer;
+use crate::de::Value;
 use crate::error::{Error, Result};
 
 pub(crate) enum ItemKind<'de> {
@@ -11,15 +11,11 @@ pub(crate) enum ItemKind<'de> {
 
 pub(crate) struct PairSeq<'de> {
     items: Vec<ItemKind<'de>>,
-    remaining_depth: u16,
 }
 
 impl<'de> PairSeq<'de> {
-    pub(crate) fn new(items: Vec<ItemKind<'de>>, remaining_depth: u16) -> Self {
-        Self {
-            items,
-            remaining_depth,
-        }
+    pub(crate) fn new(items: Vec<ItemKind<'de>>) -> Self {
+        Self { items }
     }
 }
 
@@ -31,12 +27,7 @@ impl<'de> de::SeqAccess<'de> for PairSeq<'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.items.pop() {
-            Some(ItemKind::Value(value)) => seed
-                .deserialize(&mut Deserializer::new_with_depth(
-                    value,
-                    self.remaining_depth,
-                ))
-                .map(Some),
+            Some(ItemKind::Value(value)) => seed.deserialize(&mut Value::new(value)).map(Some),
             Some(ItemKind::Map(map)) => seed.deserialize(map).map(Some),
             None => Ok(None),
         }

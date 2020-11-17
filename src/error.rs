@@ -12,6 +12,7 @@ pub enum Error {
     EofReached,
     ExpectedSeprator,
     MaximumDepthReached,
+    NotSupportedAsValue,
     Custom(String),
 }
 

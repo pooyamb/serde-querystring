@@ -6,7 +6,7 @@ use super::{
     seq::{ItemKind, PairSeq},
     Pair, Stash,
 };
-use crate::de::Deserializer;
+use crate::de::Value;
 use crate::error::{Error, Result};
 
 pub(crate) struct PairMap<'de> {
@@ -115,14 +115,13 @@ impl<'de> PairMap<'de> {
     }
 
     pub(crate) fn into_seq(self) -> Result<PairSeq<'de>> {
-        let remaining_depth = self.stash.remaining_depth;
-
         let pairs = self.into_pairs()?;
         let mut items = vec![];
         let mut sorted_items = vec![];
 
         for (key, value) in pairs {
-            if let Ok(index) = crate::from_bytes::<u16>(key) {
+            let index: Result<u16> = serde::de::Deserialize::deserialize(&mut Value::new(key));
+            if let Ok(index) = index {
                 sorted_items.push((index as isize, value));
             } else {
                 items.push((-1, value));
@@ -138,7 +137,7 @@ impl<'de> PairMap<'de> {
 
         let items = items.into_iter().map(|item| item.1).collect();
 
-        Ok(PairSeq::new(items, remaining_depth))
+        Ok(PairSeq::new(items))
     }
 }
 
@@ -206,14 +205,14 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         }
 
         if let Some(key) = self.next_key()? {
-            return seed.deserialize(&mut Deserializer::new(key)).map(Some);
+            return seed.deserialize(&mut Value::new(key)).map(Some);
         }
 
         // Visit stash
         let key = self.stash.next_key()?;
 
         match key {
-            Some(key) => seed.deserialize(&mut Deserializer::new(&key)).map(Some),
+            Some(key) => seed.deserialize(&mut Value::new(key)).map(Some),
             None => Ok(None),
         }
     }
@@ -223,10 +222,7 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         V: de::DeserializeSeed<'de>,
     {
         match self.next_value() {
-            Ok(value) => seed.deserialize(&mut Deserializer::new_with_depth(
-                value,
-                self.stash.remaining_depth - 1,
-            )),
+            Ok(value) => seed.deserialize(&mut Value::new(value)),
             _ => seed.deserialize(self.stash.next_value_map()?),
         }
     }
@@ -261,13 +257,7 @@ impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
             }
         };
 
-        Ok((
-            seed.deserialize(&mut Deserializer::new_with_depth(
-                key,
-                self.stash.remaining_depth - 1,
-            ))?,
-            self,
-        ))
+        Ok((seed.deserialize(&mut Value::new(key))?, self))
     }
 }
 
@@ -284,10 +274,7 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
         V: de::Visitor<'de>,
     {
         match self.next_value() {
-            Ok(value) => {
-                let mut de = Deserializer::new_with_depth(value, self.stash.remaining_depth - 1);
-                serde::de::Deserializer::deserialize_seq(&mut de, visitor)
-            }
+            Ok(value) => serde::de::Deserializer::deserialize_seq(&mut Value::new(value), visitor),
             _ => visitor.visit_seq(&mut self.stash.next_value_map()?.into_seq()?),
         }
     }
@@ -304,10 +291,7 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.next_value() {
-            Ok(value) => seed.deserialize(&mut Deserializer::new_with_depth(
-                value,
-                self.stash.remaining_depth - 1,
-            )),
+            Ok(value) => seed.deserialize(&mut Value::new(value)),
             _ => seed.deserialize(self.stash.next_value_map()?),
         }
     }
