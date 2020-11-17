@@ -1,83 +1,86 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::Deserialize;
+use serde_querystring::from_str;
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct Primitive<T> {
+    value: T,
+}
+
+impl<T> Primitive<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+macro_rules! p {
+    ($value:expr) => {
+        Primitive::new($value)
+    };
+}
 
 #[test]
 fn deserialize_primitive_types() {
-    assert_eq!(serde_querystring::from_str("-2500000"), Ok(-2_500_000));
-    assert_eq!(serde_querystring::from_str("2500000"), Ok(2_500_000));
-    assert_eq!(serde_querystring::from_str("test"), Ok("test".to_string()));
-    assert_eq!(serde_querystring::from_str("test"), Ok("test"));
-    assert_eq!(serde_querystring::from_str("250"), Ok("250".to_string()));
-    assert_eq!(serde_querystring::from_str("-25"), Ok("-25".to_string()));
-    assert_eq!(serde_querystring::from_str("-1.2222"), Ok(-1.2222));
-    assert_eq!(serde_querystring::from_str("1.2222"), Ok(1.2222));
+    assert_eq!(from_str("value=-2500000"), Ok(p!(-2_500_000)));
+    assert_eq!(from_str("value=2500000"), Ok(p!(2_500_000)));
+    assert_eq!(from_str("value=test"), Ok(p!("test".to_string())));
+    assert_eq!(from_str("value=test"), Ok(p!("test")));
+    assert_eq!(from_str("value=250"), Ok(p!("250".to_string())));
+    assert_eq!(from_str("value=-25"), Ok(p!("-25".to_string())));
+    assert_eq!(from_str("value=-1.2222"), Ok(p!(-1.2222)));
+    assert_eq!(from_str("value=1.2222"), Ok(p!(1.2222)));
 }
 
 #[test]
 fn deserialize_bool() {
-    assert_eq!(serde_querystring::from_str("1"), Ok(true));
-    assert_eq!(serde_querystring::from_str("on"), Ok(true));
-    assert_eq!(serde_querystring::from_str("true"), Ok(true));
-    assert_eq!(serde_querystring::from_str("0"), Ok(false));
-    assert_eq!(serde_querystring::from_str("off"), Ok(false));
-    assert_eq!(serde_querystring::from_str("false"), Ok(false));
-    assert!(serde_querystring::from_str::<bool>("bla").is_err());
+    assert_eq!(from_str("value=1"), Ok(p!(true)));
+    assert_eq!(from_str("value=on"), Ok(p!(true)));
+    assert_eq!(from_str("value=true"), Ok(p!(true)));
+    assert_eq!(from_str("value=0"), Ok(p!(false)));
+    assert_eq!(from_str("value=off"), Ok(p!(false)));
+    assert_eq!(from_str("value=false"), Ok(p!(false)));
+    assert!(from_str::<Primitive<bool>>("value=bla").is_err());
 }
 
 #[test]
 fn deserialize_unit_type() {
-    assert_eq!(serde_querystring::from_str(""), Ok(()));
-    assert_eq!(serde_querystring::from_str("&"), Ok(()));
-    assert_eq!(serde_querystring::from_str("&&"), Ok(()));
-    assert_eq!(serde_querystring::from_str("&&&"), Ok(()));
+    assert_eq!(from_str(""), Ok(()));
+    assert_eq!(from_str("&"), Ok(()));
+    assert_eq!(from_str("&&"), Ok(()));
+    assert_eq!(from_str("&&&"), Ok(()));
 }
 
-#[test]
-fn deserialize_with_extra_unit_chars() {
-    assert_eq!(serde_querystring::from_str("&200"), Ok(((), 200)));
-    assert_eq!(serde_querystring::from_str("&&-200"), Ok(((), (), -200)));
-    assert_eq!(
-        serde_querystring::from_str("&&test"),
-        Ok(((), (), "test".to_string()))
-    );
-}
-
-#[test]
-fn deserialize_sequence() {
-    let res = vec![12, 3, 4, 5, 6, -10];
-    assert_eq!(
-        serde_querystring::from_str("12,3,4,5,6,-10"),
-        Ok(res.clone())
-    );
-    assert_eq!(
-        serde_querystring::from_str("12&3&4&5&6&-10"),
-        Ok(res.clone())
-    );
-    assert_eq!(serde_querystring::from_str("12;3;4;5;6;-10"), Ok(res));
-
-    let res = vec!["asd".to_string(), "dsa".to_string(), "sss".to_string()];
-    assert_eq!(serde_querystring::from_str("asd&dsa&sss"), Ok(res));
-}
+// #[test]
+// fn deserialize_with_extra_unit_chars() {
+//     assert_eq!(from_str("&value=200"), Ok(((), p!(200))));
+//     assert_eq!(from_str("&&value=-200"), Ok(((), (), p!(-200))));
+//     assert_eq!(
+//         from_str("&&value=test"),
+//         Ok(((), (), p!("test".to_string())))
+//     );
+// }
 
 #[test]
 fn deserialize_tuple() {
-    assert_eq!(
-        serde_querystring::from_str::<(i32, i32, i32)>("12,3,4"),
-        Ok((12, 3, 4))
-    );
-    assert_eq!(
-        serde_querystring::from_str::<(i32, i32, i32)>("12,3,4,32"),
-        Ok((12, 3, 4))
-    );
+    assert_eq!(from_str("value=12,3,4"), Ok(p!((12, 3, 4))));
+    assert_eq!(from_str("value=12,3,4,32"), Ok(p!((12, 3, 4))));
 
     assert_eq!(
-        serde_querystring::from_str::<(String, String, String)>("hallo,hello,hi"),
-        Ok(("hallo".to_string(), "hello".to_string(), "hi".to_string()))
+        from_str("value=hallo,hello,hi"),
+        Ok(p!((
+            "hallo".to_string(),
+            "hello".to_string(),
+            "hi".to_string()
+        )))
     );
     assert_eq!(
-        serde_querystring::from_str::<(String, String, String)>("hallo,hello,hi,bla"),
-        Ok(("hallo".to_string(), "hello".to_string(), "hi".to_string()))
+        from_str("value=hallo,hello,hi,bla"),
+        Ok(p!((
+            "hallo".to_string(),
+            "hello".to_string(),
+            "hi".to_string()
+        )))
     );
 }
 
@@ -88,20 +91,17 @@ fn deserialize_map() {
     res.insert("key2".to_string(), 123);
     res.insert("key3".to_string(), 7);
     res.insert("key4".to_string(), 6);
-    assert_eq!(
-        serde_querystring::from_str("key1=321&key2=123&key3=7&key4=6"),
-        Ok(res)
-    );
+    assert_eq!(from_str("key1=321&key2=123&key3=7&key4=6"), Ok(res));
 }
 
 #[test]
 fn deserialize_without_and() {
-    assert!(serde_querystring::from_str::<HashMap<String, i32>>("key1=321key2=123key3=7").is_err());
+    assert!(from_str::<HashMap<String, i32>>("key1=321key2=123key3=7").is_err());
 
     let mut map = HashMap::new();
     map.insert("key1".to_string(), "321key2=123key3=7".to_string());
     assert_eq!(
-        serde_querystring::from_str::<HashMap<String, String>>("key1=321key2=123key3=7"),
+        from_str::<HashMap<String, String>>("key1=321key2=123key3=7"),
         Ok(map)
     );
 }
@@ -111,10 +111,7 @@ fn deserialize_new_type() {
     #[derive(Debug, Deserialize, Eq, PartialEq)]
     struct NewType(i32);
 
-    assert_eq!(
-        serde_querystring::from_str::<NewType>("-2500000"),
-        Ok(NewType(-2_500_000))
-    );
+    assert_eq!(from_str("value=-2500000"), Ok(p!(NewType(-2_500_000))));
 }
 
 #[test]
@@ -137,9 +134,7 @@ fn deserialize_struct() {
     };
 
     assert_eq!(
-        serde_querystring::from_str::<Sample>(
-            "neg_num=-2500&num=123&string=Hello&boolean=on&special_bool=false"
-        ),
+        from_str::<Sample>("neg_num=-2500&num=123&string=Hello&boolean=on&special_bool=false"),
         Ok(s)
     );
 }
@@ -149,9 +144,7 @@ fn deserialize_repeated_keys() {
     let mut map = HashMap::new();
     map.insert("num".to_string(), -2501);
     assert_eq!(
-        serde_querystring::from_str::<HashMap<String, i32>>(
-            "num=-2500&num=-2503&num=-2502&num=-2501"
-        ),
+        from_str::<HashMap<String, i32>>("num=-2500&num=-2503&num=-2502&num=-2501"),
         Ok(map)
     );
 }
@@ -162,7 +155,7 @@ fn deserialize_plus_to_space() {
     map.insert("num".to_string(), "rum rum".to_string());
     map.insert("yum".to_string(), "ehem ehem".to_string());
     assert_eq!(
-        serde_querystring::from_str::<HashMap<String, String>>("num=rum+rum&yum=ehem+ehem"),
+        from_str::<HashMap<String, String>>("num=rum+rum&yum=ehem+ehem"),
         Ok(map)
     );
 }
@@ -173,7 +166,7 @@ fn deserialize_percentage_decoding() {
     map.insert("baba".to_string(), "بابابزرگ".to_string());
     map.insert("amoo".to_string(), "عمو نوروز".to_string());
     assert_eq!(
-        serde_querystring::from_str::<HashMap<String, String>>(
+        from_str::<HashMap<String, String>>(
             "baba=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF&\
             amoo=%D8%B9%D9%85%D9%88%20%D9%86%D9%88%D8%B1%D9%88%D8%B2"
         ),
@@ -184,15 +177,15 @@ fn deserialize_percentage_decoding() {
 #[test]
 fn deserialize_percentage_decoding_raw() {
     assert_eq!(
-        serde_querystring::from_str::<String>("%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
-        Ok("بابابزرگ".to_string())
+        from_str("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
+        Ok(p!("بابابزرگ".to_string()))
     );
 }
 
 // It should be here, but it is not to keep the same behaviour as serde_urlencoded
 // #[test]
 // fn deserialize_percentage_invalid() {
-//     assert!(serde_querystring::from_str::<String>("%00%01%11").is_err());
+//     assert!(from_str::<String>("%00%01%11").is_err());
 // }
 
 #[test]
@@ -214,7 +207,7 @@ fn deserialize_struct_with_non_primitive_chilren() {
     };
 
     assert_eq!(
-        serde_querystring::from_str::<Human>("favs=1,2,3&abblities=eats,reads,cries&age=69"),
+        from_str::<Human>("favs=1,2,3&abblities=eats,reads,cries&age=69"),
         Ok(human)
     );
 }
@@ -256,7 +249,7 @@ fn deserialize_struct_with_struct_chilren() {
     });
 
     assert_eq!(
-        serde_querystring::from_str::<Human>(
+        from_str::<Human>(
             "child[age]=12&child[reads]=on&name=Regina+Phalange&book[pages]=300&book[finished]=true\
             &child[book][pages]=1000&child[book][finished]=off"
         ),
@@ -264,7 +257,7 @@ fn deserialize_struct_with_struct_chilren() {
     );
 
     assert_eq!(
-        serde_querystring::from_str::<Human>(
+        from_str::<Human>(
             "name=Regina+Phalange&child[age]=12&child[reads]=on&book[pages]=300\
             &book[finished]=true&child[book][pages]=1000&child[book][finished]=off"
         ),
@@ -307,7 +300,7 @@ fn deserialize_so_many_levels() {
     let map = hashmap_it(map);
     let map = hashmap_it(map);
 
-    let deserialized = serde_querystring::from_str(
+    let deserialized = from_str(
         "key[key][key][key][key][key][key][key][key][key][key][key]\
         [key][key][key][key][key][key][key][key][key]=value",
     )
@@ -332,16 +325,10 @@ fn deserialize_tuple_key() {
 
     let res = Ok(Sample { weight });
 
-    assert_eq!(
-        serde_querystring::from_str("weight[1,1,1]=1200&weight[2,2,2]=2400"),
-        res
-    );
+    assert_eq!(from_str("weight[1,1,1]=1200&weight[2,2,2]=2400"), res);
 
     // This should also work as we ignore everything after the last ,
-    assert_eq!(
-        serde_querystring::from_str("weight[1,1,1,1]=1200&weight[2,2,2,2]=2400"),
-        res
-    );
+    assert_eq!(from_str("weight[1,1,1,1]=1200&weight[2,2,2,2]=2400"), res);
 
     // The same with strings
     #[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
@@ -364,44 +351,33 @@ fn deserialize_tuple_key() {
 
     let res = Ok(SampleString { weight });
 
-    assert_eq!(
-        serde_querystring::from_str("weight[1a,1a,1a]=big&weight[2a,2a,2a]=small"),
-        res
-    );
+    assert_eq!(from_str("weight[1a,1a,1a]=big&weight[2a,2a,2a]=small"), res);
 
     // This should also work as we ignore everything after the last ,
     assert_eq!(
-        serde_querystring::from_str("weight[1a,1a,1a,1a]=big&weight[2a,2a,2a,2a]=small"),
+        from_str("weight[1a,1a,1a,1a]=big&weight[2a,2a,2a,2a]=small"),
         res
     );
 }
 
+// We don't support these kind of recursive structures
 #[test]
 fn deserialize_invalid_recursion() {
-    use std::collections::BTreeMap;
-
     #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
     struct A {
         a: BTreeMap<i32, A>,
     };
 
-    // The form of a[2]=a[2]=4 should not be allowed, but it is for now
-    let mut s = String::new();
-    for _ in 0..1000 {
-        s.push_str("a[2]=");
-    }
-    s.push('1');
-
-    assert!(serde_querystring::from_str::<A>(&s).is_err());
+    assert!(from_str::<A>("a[2]=a[2]=").is_err());
 
     #[derive(Debug, Clone, Deserialize)]
     struct A2(Vec<A2>);
 
-    assert!(serde_querystring::from_str::<A2>("1,1,1").is_err())
+    assert!(from_str::<Primitive<A2>>("value=1,1,1").is_err())
 }
 
 #[test]
-fn deserialize_invalid_recursion_key() {
+fn deserialize_recursion_overflow() {
     #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
     struct B {
         a: Box<Option<B>>,
@@ -412,36 +388,43 @@ fn deserialize_invalid_recursion_key() {
         a: B,
     };
 
+    // An input of `a[a][a][a][a]=` is valid in this case, but as long as we stay below the recurstion limit
     let mut s = "a".to_string();
-
-    for _ in 0..128 {
+    for _ in 0..63 {
         s.push_str("[a]");
     }
+    s.push_str("=");
 
-    s.push_str("=2");
+    assert!(from_str::<A>(&s).is_ok());
 
-    assert!(serde_querystring::from_str::<A>(&s).is_err());
+    let mut s = "a".to_string();
+    for _ in 0..64 {
+        s.push_str("[a]");
+    }
+    s.push_str("=");
+
+    assert!(from_str::<A>(&s).is_err());
 }
 
 #[test]
 fn deserialize_number_overflow() {
     let max_u32_plus_1 = (u32::max_value() as i64) + 1;
-    assert!(serde_querystring::from_str::<u32>(&max_u32_plus_1.to_string()).is_err());
+    assert!(from_str::<Primitive<u32>>(&format!("value={}", max_u32_plus_1)).is_err());
 
-    let max_i32_neg = -(max_u32_plus_1 / 2);
-    assert!(serde_querystring::from_str::<u32>(&max_i32_neg.to_string()).is_err());
+    let max_i32_neg_minus_one = -(max_u32_plus_1 / 2) - 1;
+    assert!(from_str::<Primitive<i32>>(&format!("value={}", max_i32_neg_minus_one)).is_err());
 
-    assert!(serde_querystring::from_str::<u64>("18446744073709551616").is_err());
+    assert!(from_str::<Primitive<u64>>("value=18446744073709551616").is_err());
 
-    assert!(serde_querystring::from_str::<i64>("-9223372036854775809").is_err());
+    assert!(from_str::<Primitive<i64>>("value=-9223372036854775809").is_err());
 
     assert_eq!(
-        serde_querystring::from_str::<f64>("18446744073709551616"),
-        Ok(18446744073709551616_f64)
+        from_str("value=18446744073709551616"),
+        Ok(p!(18446744073709551616_f64))
     );
     assert_eq!(
-        serde_querystring::from_str::<f64>("-18446744073709551616"),
-        Ok(-18446744073709551616_f64)
+        from_str("value=-18446744073709551616"),
+        Ok(p!(-18446744073709551616_f64))
     );
 }
 
@@ -455,13 +438,13 @@ fn deserialize_unit_enums() {
         God,
     }
 
-    assert_eq!(serde_querystring::from_str::<Side>("God"), Ok(Side::God));
+    assert_eq!(from_str("value=God"), Ok(p!(Side::God)));
 
     let mut map = HashMap::new();
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        serde_querystring::from_str::<HashMap<Side, &str>>("God=winner&Right=looser"),
+        from_str::<HashMap<Side, &str>>("God=winner&Right=looser"),
         Ok(map)
     );
 
@@ -472,7 +455,7 @@ fn deserialize_unit_enums() {
         winner: Side,
     }
     assert_eq!(
-        serde_querystring::from_str::<A>("looser=Left&winner=God"),
+        from_str::<A>("looser=Left&winner=God"),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -490,9 +473,7 @@ fn deserialize_unit_enums() {
     map.insert(Side::Right, -1);
     map.insert(Side::Left, -1);
     assert_eq!(
-        serde_querystring::from_str::<B>(
-            "sides=God,Left,Right&result[God]=10&result[Right]=-1&result[Left]=-1"
-        ),
+        from_str::<B>("sides=God,Left,Right&result[God]=10&result[Right]=-1&result[Left]=-1"),
         Ok(B {
             sides: vec![Side::God, Side::Left, Side::Right],
             result: map
@@ -515,40 +496,19 @@ fn deserialize_enum_in_map() {
 
     use Event::*;
 
-    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-    struct A {
-        last_event: Event,
-    }
-
+    assert_eq!(from_str("value=PageLoad"), Ok(p!(PageLoad)));
+    assert_eq!(from_str("value[KeyPress]=2"), Ok(p!(KeyPress('2'))));
     assert_eq!(
-        serde_querystring::from_str::<A>("last_event=PageLoad"),
-        Ok(A {
-            last_event: PageLoad
-        })
+        from_str("value[Paste]=asd"),
+        Ok(p!(Paste("asd".to_string())))
     );
     assert_eq!(
-        serde_querystring::from_str::<A>("last_event[KeyPress]=2"),
-        Ok(A {
-            last_event: KeyPress('2')
-        })
+        from_str("value[Missed]=1200,2400"),
+        Ok(p!(Missed(1200, 2400)))
     );
     assert_eq!(
-        serde_querystring::from_str::<A>("last_event[Paste]=asd"),
-        Ok(A {
-            last_event: Paste("asd".to_string())
-        })
-    );
-    assert_eq!(
-        serde_querystring::from_str::<A>("last_event[Missed]=1200,2400"),
-        Ok(A {
-            last_event: Missed(1200, 2400)
-        })
-    );
-    assert_eq!(
-        serde_querystring::from_str::<A>("last_event[Click][x]=5500&last_event[Click][y]=6900"),
-        Ok(A {
-            last_event: Click { x: 5500, y: 6900 }
-        })
+        from_str("value[Click][x]=5500&value[Click][y]=6900"),
+        Ok(p!(Click { x: 5500, y: 6900 }))
     );
 }
 
@@ -567,83 +527,62 @@ fn deserialize_enums() {
 
     // deserialize to enum itself
     // unit
-    assert_eq!(
-        serde_querystring::from_str::<Event>("PageUnload"),
-        Ok(PageUnload)
-    );
+    assert_eq!(from_str::<Event>("PageUnload"), Ok(PageUnload));
 
     // sequence
     assert_eq!(
-        serde_querystring::from_str::<Event>("Missed=400,640"),
+        from_str::<Event>("Missed=400,640"),
         Ok(Event::Missed(400, 640))
     );
     assert_eq!(
-        serde_querystring::from_str::<Event>("Missed[]=400&Missed[]=640"),
+        from_str::<Event>("Missed[]=400&Missed[]=640"),
         Ok(Event::Missed(400, 640))
     );
     assert_eq!(
-        serde_querystring::from_str::<Event>("Missed[1]=640&Missed[0]=400"),
+        from_str::<Event>("Missed[1]=640&Missed[0]=400"),
         Ok(Event::Missed(400, 640))
     );
 
     // struct
     assert_eq!(
-        serde_querystring::from_str::<Event>("Click[x]=100&Click[y]=240"),
+        from_str::<Event>("Click[x]=100&Click[y]=240"),
         Ok(Event::Click { x: 100, y: 240 })
     );
 
     // new type
-    assert_eq!(
-        serde_querystring::from_str::<Event>("KeyPress=X"),
-        Ok(Event::KeyPress('X'))
-    );
+    assert_eq!(from_str::<Event>("KeyPress=X"), Ok(Event::KeyPress('X')));
 
     use Event::*;
 
-    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-    struct A {
-        events: Vec<Event>,
-    }
-
     // unit enums
     assert_eq!(
-        serde_querystring::from_str::<A>("events=PageLoad,PageUnload"),
-        Ok(A {
-            events: vec![PageLoad, PageUnload]
-        })
+        from_str("value=PageLoad,PageUnload"),
+        Ok(p!(vec![PageLoad, PageUnload]))
     );
     assert_eq!(
-        serde_querystring::from_str::<A>("events[]=PageLoad&events[]=PageUnload"),
-        Ok(A {
-            events: vec![PageLoad, PageUnload]
-        })
+        from_str("value[]=PageLoad&value[]=PageUnload"),
+        Ok(p!(vec![PageLoad, PageUnload]))
     );
 
     // struct and tuple enums
     assert_eq!(
-        serde_querystring::from_str::<A>(
-            "events[][Paste]=asd&events[][Missed]=1200,2400\
-            &events[group_1][Click][x]=5500&events[group_1][Click][y]=6900"
+        from_str(
+            "value[][Paste]=asd&value[][Missed]=1200,2400\
+            &value[group_1][Click][x]=5500&value[group_1][Click][y]=6900"
         ),
-        Ok(A {
-            events: vec![
-                Paste("asd".to_string()),
-                Missed(1200, 2400),
-                Click { x: 5500, y: 6900 },
-            ]
-        })
+        Ok(p!(vec![
+            Paste("asd".to_string()),
+            Missed(1200, 2400),
+            Click { x: 5500, y: 6900 },
+        ]))
     );
     assert_eq!(
-        serde_querystring::from_str::<A>(
-            "events[][Missed]=1200,2400&events[][Missed]=1200,2400&events[][Paste]=asd"
-        ),
-        Ok(A {
-            events: vec![
-                Missed(1200, 2400),
-                Missed(1200, 2400),
-                Paste("asd".to_string())
-            ]
-        })
+        from_str("value[][Missed]=1200,2400&value[][Missed]=1200,2400&value[][Paste]=asd"),
+        Ok(p!(vec![
+            Missed(1200, 2400),
+            Missed(1200, 2400),
+            Paste("asd".to_string())
+        ]))
     );
 }
 
@@ -655,7 +594,7 @@ fn deserialize_sequence_key() {
         average: i32,
     }
     assert_eq!(
-        serde_querystring::from_str::<UvRate>("nums[]=1&nums[]=3&nums[]=1337&average=447"),
+        from_str::<UvRate>("nums[]=1&nums[]=3&nums[]=1337&average=447"),
         Ok(UvRate {
             nums: vec![1, 3, 1337],
             average: 447
@@ -663,7 +602,7 @@ fn deserialize_sequence_key() {
     );
 
     assert_eq!(
-        serde_querystring::from_str::<UvRate>("nums[0]=1&nums[1]=2&nums[2]=1337&average=300"),
+        from_str::<UvRate>("nums[0]=1&nums[1]=2&nums[2]=1337&average=300"),
         Ok(UvRate {
             nums: vec![1, 2, 1337],
             average: 300
@@ -676,9 +615,7 @@ fn deserialize_sequence_key() {
     }
 
     assert_eq!(
-        serde_querystring::from_str::<Country>(
-            "sun[nums][]=1&sun[nums][]=3&sun[nums][]=1337&sun[average]=447"
-        ),
+        from_str::<Country>("sun[nums][]=1&sun[nums][]=3&sun[nums][]=1337&sun[average]=447"),
         Ok(Country {
             sun: UvRate {
                 nums: vec![1, 3, 1337],
@@ -688,9 +625,7 @@ fn deserialize_sequence_key() {
     );
 
     assert_eq!(
-        serde_querystring::from_str::<Country>(
-            "sun[nums][0]=1&sun[nums][1]=2&sun[nums][2]=1337&sun[average]=300"
-        ),
+        from_str::<Country>("sun[nums][0]=1&sun[nums][1]=2&sun[nums][2]=1337&sun[average]=300"),
         Ok(Country {
             sun: UvRate {
                 nums: vec![1, 2, 1337],
@@ -713,7 +648,7 @@ fn deserialize_sequence_key() {
     }
 
     assert_eq!(
-        serde_querystring::from_str::<City>(
+        from_str::<City>(
             "history[0]=Cold&history[1][Rainy]=a,b&history[2][Sunny][uv]=100&history[2][Sunny][tempt]=100&\
             history[3][Hot]=10&history[4][Rainy][]=k&history[4][Rainy][]=o"
         ),
@@ -729,18 +664,9 @@ fn deserialize_sequence_key() {
 
 #[test]
 fn deserialize_sequence_key_ordered() {
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct A {
-        x: Vec<i32>,
-    }
-
     assert_eq!(
-        serde_querystring::from_str::<A>(
-            "x[10]=9&x[10]=10&x[1]=2&x[8]=8&x[2]=3&x[6]=7&x[0]=1&x[]=0"
-        ),
-        Ok(A {
-            x: vec![0, 1, 2, 3, 7, 8, 9]
-        })
+        from_str("value[10]=9&value[10]=10&value[1]=2&value[8]=8&value[2]=3&value[6]=7&value[0]=1&value[]=0"),
+        Ok(p!(vec![0, 1, 2, 3, 7, 8, 9]))
     );
 
     #[derive(Debug, Deserialize, PartialEq)]
@@ -751,26 +677,19 @@ fn deserialize_sequence_key_ordered() {
         R { x: i32, y: i32 },
     }
 
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct X {
-        a: Vec<Anum>,
-    }
-
     // Keyed sequences are first come first serve
     assert_eq!(
-        serde_querystring::from_str::<X>("a[1][E][]=1&a[1][R][y]=2&a[1][E][]=2&a[1][R][x]=1"),
-        Ok(X {
-            a: vec![Anum::E(1, 2)]
-        })
+        from_str("value[1][E][]=1&value[1][R][y]=2&value[1][E][]=2&value[1][R][x]=1"),
+        Ok(p!(vec![Anum::E(1, 2)]))
     );
 }
 
 #[test]
 fn deserialize_invalid() {
-    // serde_querystring::from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
+    // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
 }
 
 #[test]
 fn deserialize_to_unit() {
-    // serde_querystring::from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
+    // from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
 }
