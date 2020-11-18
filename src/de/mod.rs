@@ -8,11 +8,12 @@ mod seq;
 mod stash;
 mod value;
 
+use parser::{Pair, Parser};
 use stash::Stash;
 use value::Value;
 
 pub(crate) struct Deserializer<'de> {
-    parser: parser::Parser<'de>,
+    parser: Parser<'de>,
     value: Option<&'de [u8]>,
     stash: Stash<'de>,
 }
@@ -20,101 +21,33 @@ pub(crate) struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     pub fn new(slice: &'de [u8]) -> Self {
         Self {
-            parser: parser::Parser::new(slice),
+            parser: Parser::new(slice),
             stash: Stash::new(64),
             value: None,
         }
     }
 
-    fn parse_children_pair(&mut self, start_index: usize) -> Result<usize> {
-        if start_index + 1 > self.parser.slice.len() {
-            return Err(Error::EofReached);
-        }
-
-        let mut key_index = start_index + 1;
-        while key_index < self.parser.slice.len() {
-            match self.parser.slice[key_index] {
-                b'=' => {
-                    break;
+    fn next_key(&mut self) -> Result<Option<&'de [u8]>> {
+        while let Some(pair) = self.parser.parse_pair()? {
+            match pair {
+                Pair::Root(key, value) => {
+                    self.value = Some(value);
+                    return Ok(Some(key));
                 }
-                _ => {
-                    key_index += 1;
+                Pair::Sub(key, subkey, value) => {
+                    self.stash.add(key, subkey, value);
                 }
             }
         }
-
-        if key_index == self.parser.slice.len() {
-            // We faced early finish
-            return Err(Error::InvalidMapKey);
-        }
-
-        if key_index == start_index + 1 {
-            return Err(Error::InvalidMapKey);
-        }
-
-        let mut value_index = key_index + 1;
-        while value_index < self.parser.slice.len() {
-            match self.parser.slice[value_index] {
-                b';' | b'&' => {
-                    break;
-                }
-                _ => {
-                    value_index += 1;
-                }
-            }
-        }
-
-        self.stash.add(
-            &self.parser.slice[self.parser.index..start_index],
-            &self.parser.slice[(start_index + 1)..key_index],
-            &self.parser.slice[(key_index + 1)..value_index],
-        );
-        Ok(value_index)
+        Ok(None)
     }
 
-    fn parse_pair<'s>(&'s mut self) -> Result<Option<&'de [u8]>> {
-        // Parse key
-        let mut key_found = false;
-        let mut key_index = self.parser.index;
-        while key_index < self.parser.slice.len() {
-            match self.parser.slice[key_index] {
-                b'=' => {
-                    key_found = true;
-                    break;
-                }
-                b'[' => {
-                    // It's a subkey
-                    let end_index = self.parse_children_pair(key_index)?;
-                    self.parser.index = end_index + 1;
-                    key_index = end_index + 1;
-                }
-                _ => {
-                    key_index += 1;
-                }
-            }
+    fn next_value(&mut self) -> Result<&'de [u8]> {
+        if let Some(val) = self.value.take() {
+            Ok(val)
+        } else {
+            Err(Error::InvalidMapValue)
         }
-
-        if !key_found {
-            return Ok(None);
-        }
-        let key = &self.parser.slice[self.parser.index..key_index];
-
-        let mut value_index = key_index + 1;
-        while value_index < self.parser.slice.len() {
-            match self.parser.slice[value_index] {
-                b';' | b'&' => {
-                    break;
-                }
-                _ => {
-                    value_index += 1;
-                }
-            }
-        }
-        self.value = Some(&self.parser.slice[(key_index + 1)..value_index]);
-
-        self.parser.index = value_index + 1;
-
-        Ok(Some(key))
     }
 }
 
@@ -176,7 +109,7 @@ impl<'de> de::MapAccess<'de> for Deserializer<'de> {
         K: de::DeserializeSeed<'de>,
     {
         if !self.parser.done() {
-            let key = self.parse_pair()?;
+            let key = self.next_key()?;
             if let Some(key) = key {
                 return seed.deserialize(&mut Value::new(key)).map(Some);
             }
@@ -194,9 +127,9 @@ impl<'de> de::MapAccess<'de> for Deserializer<'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        match self.value.take() {
-            Some(value) => seed.deserialize(&mut Value::new(value)),
-            None => seed.deserialize(self.stash.next_value_map()?),
+        match self.next_value() {
+            Ok(value) => seed.deserialize(&mut Value::new(value)),
+            _ => seed.deserialize(self.stash.next_value_map()?),
         }
     }
 }

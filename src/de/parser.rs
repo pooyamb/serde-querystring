@@ -443,6 +443,100 @@ impl<'de> Parser<'de> {
         }
     }
 
+    pub(crate) fn parse_subpair(&mut self, start_index: usize) -> Result<Option<Pair<'de>>> {
+        if start_index + 1 > self.slice.len() {
+            return Err(Error::EofReached);
+        }
+
+        let mut key_index = start_index + 1;
+        while key_index < self.slice.len() {
+            match self.slice[key_index] {
+                b'=' => {
+                    break;
+                }
+                _ => {
+                    key_index += 1;
+                }
+            }
+        }
+
+        if key_index == self.slice.len() {
+            // Empty keys are not supported at root level
+            return Err(Error::InvalidMapKey);
+        }
+
+        if key_index == start_index + 1 {
+            return Err(Error::InvalidMapKey);
+        }
+
+        let mut value_index = key_index + 1;
+        while value_index < self.slice.len() {
+            match self.slice[value_index] {
+                b';' | b'&' => {
+                    break;
+                }
+                _ => {
+                    value_index += 1;
+                }
+            }
+        }
+
+        let res = Pair::Sub(
+            &self.slice[self.index..start_index],
+            &self.slice[(start_index + 1)..key_index],
+            &self.slice[(key_index + 1)..value_index],
+        );
+
+        self.index = value_index + 1;
+
+        Ok(Some(res))
+    }
+
+    pub(crate) fn parse_pair(&mut self) -> Result<Option<Pair<'de>>> {
+        // Parse key
+        let mut key_found = false;
+        let mut key_index = self.index;
+        while key_index < self.slice.len() {
+            match self.slice[key_index] {
+                b'=' => {
+                    key_found = true;
+                    break;
+                }
+                b'[' => {
+                    // It's a subkey
+                    return self.parse_subpair(key_index);
+                }
+                _ => {
+                    key_index += 1;
+                }
+            }
+        }
+
+        if !key_found {
+            return Ok(None);
+        }
+        let key = &self.slice[self.index..key_index];
+
+        let mut value_index = key_index + 1;
+        while value_index < self.slice.len() {
+            match self.slice[value_index] {
+                b';' | b'&' => {
+                    break;
+                }
+                _ => {
+                    value_index += 1;
+                }
+            }
+        }
+
+        self.index = value_index + 1;
+
+        Ok(Some(Pair::Root(
+            key,
+            &self.slice[(key_index + 1)..value_index],
+        )))
+    }
+
     pub(crate) fn done(&self) -> bool {
         self.index >= self.slice.len()
     }
@@ -481,6 +575,11 @@ pub static POW10: [f64; 309] = [
     1e290, 1e291, 1e292, 1e293, 1e294, 1e295, 1e296, 1e297, 1e298, 1e299, //
     1e300, 1e301, 1e302, 1e303, 1e304, 1e305, 1e306, 1e307, 1e308,
 ];
+
+pub(crate) enum Pair<'de> {
+    Root(&'de [u8], &'de [u8]),
+    Sub(&'de [u8], &'de [u8], &'de [u8]),
+}
 
 pub(crate) enum ReaderNumber {
     F64(f64),
