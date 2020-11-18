@@ -497,6 +497,11 @@ fn deserialize_enum_in_map() {
     use Event::*;
 
     assert_eq!(from_str("value=PageLoad"), Ok(p!(PageLoad)));
+    assert_eq!(
+        from_str("value=PageLoad,PageUnload"),
+        Ok(p!((PageLoad, PageUnload)))
+    );
+    assert_eq!(from_str("value[PageLoad]="), Ok(p!(PageLoad)));
     assert_eq!(from_str("value[KeyPress]=2"), Ok(p!(KeyPress('2'))));
     assert_eq!(
         from_str("value[Paste]=asd"),
@@ -507,61 +512,16 @@ fn deserialize_enum_in_map() {
         Ok(p!(Missed(1200, 2400)))
     );
     assert_eq!(
+        from_str("value[Missed][]=1200&value[Missed][]=2400"),
+        Ok(p!(Missed(1200, 2400)))
+    );
+    assert_eq!(
+        from_str("value[Missed][2]=2400&value[Missed][1]=1200"),
+        Ok(p!(Missed(1200, 2400)))
+    );
+    assert_eq!(
         from_str("value[Click][x]=5500&value[Click][y]=6900"),
         Ok(p!(Click { x: 5500, y: 6900 }))
-    );
-}
-
-#[test]
-fn deserialize_enums() {
-    // from rust by example book
-    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-    enum Event {
-        PageLoad,
-        PageUnload,
-        KeyPress(char),
-        Paste(String),
-        Click { x: i64, y: i64 },
-        Missed(i32, i32),
-    }
-
-    // deserialize to enum itself
-    // unit
-    assert_eq!(from_str::<Event>("PageUnload"), Ok(PageUnload));
-
-    // sequence
-    assert_eq!(
-        from_str::<Event>("Missed=400,640"),
-        Ok(Event::Missed(400, 640))
-    );
-    assert_eq!(
-        from_str::<Event>("Missed[]=400&Missed[]=640"),
-        Ok(Event::Missed(400, 640))
-    );
-    assert_eq!(
-        from_str::<Event>("Missed[1]=640&Missed[0]=400"),
-        Ok(Event::Missed(400, 640))
-    );
-
-    // struct
-    assert_eq!(
-        from_str::<Event>("Click[x]=100&Click[y]=240"),
-        Ok(Event::Click { x: 100, y: 240 })
-    );
-
-    // new type
-    assert_eq!(from_str::<Event>("KeyPress=X"), Ok(Event::KeyPress('X')));
-
-    use Event::*;
-
-    // unit enums
-    assert_eq!(
-        from_str("value=PageLoad,PageUnload"),
-        Ok(p!(vec![PageLoad, PageUnload]))
-    );
-    assert_eq!(
-        from_str("value[]=PageLoad&value[]=PageUnload"),
-        Ok(p!(vec![PageLoad, PageUnload]))
     );
 
     // struct and tuple enums

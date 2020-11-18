@@ -57,7 +57,7 @@ impl<'de> Parser<'de> {
     }
 
     // Return what you see before the next delimiter
-    pub(crate) fn parse_token(&mut self) -> Result<&[u8]> {
+    pub(crate) fn parse_token(&mut self) -> Result<&'de [u8]> {
         if self.done() {
             return Err(Error::EofReached);
         }

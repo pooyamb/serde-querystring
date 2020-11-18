@@ -1,4 +1,3 @@
-use serde::de::IntoDeserializer;
 use serde::{de, forward_to_deserialize_any};
 
 use crate::error::{Error, Result};
@@ -161,21 +160,9 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_unit()
     }
 
-    fn deserialize_enum<V>(
-        self,
-        _: &'static str,
-        _: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_enum(self)
-    }
-
     forward_to_deserialize_any! {
         <W: Visitor<'de>>
-        char str string bytes byte_buf unit_struct tuple_struct option
+        char str string bytes byte_buf unit_struct tuple_struct option enum
         identifier ignored_any tuple seq newtype_struct bool
         i8 i16 i32 i64 u8 u16 u32 u64 f32 f64
     }
@@ -206,80 +193,6 @@ impl<'de> de::MapAccess<'de> for Deserializer<'de> {
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
     where
         V: de::DeserializeSeed<'de>,
-    {
-        match self.value.take() {
-            Some(value) => seed.deserialize(&mut Value::new(value)),
-            None => seed.deserialize(self.stash.next_value_map()?),
-        }
-    }
-}
-
-impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
-    type Error = Error;
-    type Variant = Self;
-
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant)>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        // For enums in the form of variant=value
-        if !self.parser.done() {
-            if let Some(key) = self.parse_pair()? {
-                return seed
-                    .deserialize(&mut Value::new(&key))
-                    .map(|res| (res, self));
-            }
-        }
-
-        // Visit stash
-        let key = self.stash.next_key()?;
-        match key {
-            Some(key) => seed
-                .deserialize(&mut Value::new(&key))
-                .map(|res| (res, self)),
-            None => {
-                // Just visit one single token if available, it is here to cover enum unit values
-                let key = std::str::from_utf8(self.parser.parse_token()?)
-                    .map_err(|_| Error::InvalidString)?;
-                seed.deserialize(key.into_deserializer())
-                    .map(|res| (res, self))
-            }
-        }
-    }
-}
-
-impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
-    type Error = Error;
-
-    fn unit_variant(self) -> Result<()> {
-        Ok(())
-    }
-
-    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        match self.value.take() {
-            Some(value) => {
-                let mut de = Value::new(value);
-                visitor.visit_seq(&mut de)
-            }
-            None => visitor.visit_seq(self.stash.next_value_map()?.into_seq()?),
-        }
-    }
-
-    fn struct_variant<V>(self, _fields: &'static [&'static str], visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        // We already visited the key in enumaccess above
-        let _ = self.stash.next_key()?;
-        visitor.visit_map(self.stash.next_value_map()?)
-    }
-
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
-    where
-        T: de::DeserializeSeed<'de>,
     {
         match self.value.take() {
             Some(value) => seed.deserialize(&mut Value::new(value)),

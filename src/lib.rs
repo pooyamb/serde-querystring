@@ -48,7 +48,7 @@
 //! * It is only considered a value if it consist of other values.
 //!
 //! ## Map/Struct
-//! A query string starts either by a `map` or a `struct` at its roots, these two are represented in the same
+//! A query string starts either by a `map` or a `struct` at its root, these two are represented in the same
 //! way and are considered the same kind of entity except when dealing with repeated keys(Described later).
 //! To represent them, we start from the root's fields and consider every one of them a key, if the value
 //! associated with that group/key also needs a sub group itself, we consider that group name as a subkey of our main key.
