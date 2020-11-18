@@ -1,5 +1,20 @@
-# Serde query string parser
+<h1 align="center">Serde-querystring</h1>
+<br />
 
+<div align="center">
+  <a href="https://crates.io/crates/serde-querystring">
+    <img src="https://img.shields.io/crates/v/serde-querystring.svg?style=flat-square"
+    alt="Crates.io version" />
+  </a>
+  <a href="https://docs.rs/serde-querystring">
+    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+      alt="docs.rs docs" />
+  </a>
+  <img src="https://img.shields.io/github/workflow/status/pooyamb/serde-querystring/Test?style=flat-square" alt="actions status" />
+  <img alt="Crates.io license" src="https://img.shields.io/crates/l/serde-querystring?style=flat-square">
+</div>
+
+<br>
 An alternative query string parser based on serde for rust.
 
 ## Install
@@ -17,7 +32,7 @@ serde-querystring = "0.0.4"
 let x: MyStruct = serde_querystring::from_str("YOUR QUERY STRING");
 ```
 
-Look at the tests folder to find the samples of what is supported and what is not.
+To see what is supported and what is not, please [read the docs](https://docs.rs/serde-querystring).
 
 ## Why
 
