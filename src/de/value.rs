@@ -1,5 +1,3 @@
-use std::str;
-
 use serde::de::IntoDeserializer;
 use serde::{de, forward_to_deserialize_any};
 
@@ -240,8 +238,8 @@ impl<'de> de::EnumAccess<'de> for &mut Value<'de> {
         V: de::DeserializeSeed<'de>,
     {
         seed.deserialize(
-            str::from_utf8(self.parser.parse_token()?)
-                .map_err(|_| Error::EofReached)?
+            self.parser
+                .parse_str(&mut self.scratch)?
                 .into_deserializer(),
         )
         .map(|res| (res, self))

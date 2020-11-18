@@ -56,28 +56,6 @@ impl<'de> Parser<'de> {
         self.index += 1;
     }
 
-    // Return what you see before the next delimiter
-    pub(crate) fn parse_token(&mut self) -> Result<&'de [u8]> {
-        if self.done() {
-            return Err(Error::EofReached);
-        }
-
-        let start = self.index;
-
-        while self.index < self.slice.len() {
-            match self.slice[self.index] {
-                b'&' | b';' => {
-                    break;
-                }
-                _ => {
-                    self.index += 1;
-                }
-            }
-        }
-
-        Ok(&self.slice[start..self.index])
-    }
-
     pub(crate) fn parse_str_bytes<'s, T, F>(
         &'s mut self,
         scratch: &'s mut Vec<u8>,

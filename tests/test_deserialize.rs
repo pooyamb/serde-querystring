@@ -486,22 +486,38 @@ fn deserialize_enum_in_map() {
     // from rust by example book
     #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
     enum Event {
+        #[serde(rename = "بارگذاری صفحه")]
         PageLoad,
         PageUnload,
         KeyPress(char),
         Paste(String),
-        Click { x: i64, y: i64 },
+        Click {
+            x: i64,
+            y: i64,
+        },
         Missed(i32, i32),
     }
 
     use Event::*;
 
-    assert_eq!(from_str("value=PageLoad"), Ok(p!(PageLoad)));
     assert_eq!(
-        from_str("value=PageLoad,PageUnload"),
+        from_str(
+            "value=%D8%A8%D8%A7%D8%B1%DA%AF%D8%B0%D8%A7%D8%B1%DB%8C%20%D8%B5%D9%81%D8%AD%D9%87"
+        ),
+        Ok(p!(PageLoad))
+    );
+    assert_eq!(from_str("value=PageUnload"), Ok(p!(PageUnload)));
+    assert_eq!(
+        from_str("value=%D8%A8%D8%A7%D8%B1%DA%AF%D8%B0%D8%A7%D8%B1%DB%8C%20%D8%B5%D9%81%D8%AD%D9%87,PageUnload"),
         Ok(p!((PageLoad, PageUnload)))
     );
-    assert_eq!(from_str("value[PageLoad]="), Ok(p!(PageLoad)));
+    assert_eq!(
+        from_str(
+            "value[%D8%A8%D8%A7%D8%B1%DA%AF%D8%B0%D8%A7%D8%B1%DB%8C%20%D8%B5%D9%81%D8%AD%D9%87]="
+        ),
+        Ok(p!(PageLoad))
+    );
+    assert_eq!(from_str("value[PageUnload]="), Ok(p!(PageUnload)));
     assert_eq!(from_str("value[KeyPress]=2"), Ok(p!(KeyPress('2'))));
     assert_eq!(
         from_str("value[Paste]=asd"),
