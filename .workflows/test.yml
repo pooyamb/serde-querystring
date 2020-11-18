@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Copied from sqlx
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # this is cheaper than requesting the non-minimal profile
+      - run: rustup component add rustfmt
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  check:
+    name: Check
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+  test:
+    name: Tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: >
+            --all-features --workspace -- --test-threads=1
