@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 
 use serde::{de, forward_to_deserialize_any};
@@ -13,6 +14,49 @@ pub(crate) struct PairMap<'de> {
     pairs: VecDeque<Pair<'de>>,
     value: Option<&'de [u8]>,
     stash: Stash<'de>,
+}
+
+#[derive(Copy, Clone)]
+enum KeyType<'a> {
+    Number(u16),
+    Name(&'a [u8]),
+    None,
+}
+
+impl<'a> PartialOrd for KeyType<'a> {
+    fn partial_cmp(&self, other: &KeyType) -> Option<Ordering> {
+        if let KeyType::Number(num1) = self {
+            if let KeyType::Number(num2) = other {
+                Some(num1.cmp(num2))
+            } else {
+                Some(Ordering::Greater)
+            }
+        } else if let KeyType::Number(_) = other {
+            Some(Ordering::Less)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> PartialEq for KeyType<'a> {
+    fn eq(&self, other: &KeyType<'a>) -> bool {
+        if let KeyType::Number(num1) = self {
+            if let KeyType::Number(num2) = other {
+                num1 == num2
+            } else {
+                false
+            }
+        } else if let KeyType::Name(name1) = self {
+            if let KeyType::Name(name2) = other {
+                name1 == name2
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 impl<'de> PairMap<'de> {
@@ -117,23 +161,24 @@ impl<'de> PairMap<'de> {
     pub(crate) fn into_seq(self) -> Result<PairSeq<'de>> {
         let pairs = self.into_pairs()?;
         let mut items = vec![];
-        let mut sorted_items = vec![];
 
         for (key, value) in pairs {
-            let index: Result<u16> = serde::de::Deserialize::deserialize(&mut Value::new(key));
-            if let Ok(index) = index {
-                sorted_items.push((index as isize, value));
+            if key.is_empty() {
+                items.push((KeyType::None, value))
             } else {
-                items.push((-1, value));
+                let index: Result<u16> = serde::de::Deserialize::deserialize(&mut Value::new(key));
+                if let Ok(index) = index {
+                    items.push((KeyType::Number(index), value));
+                } else {
+                    items.push((KeyType::Name(key), value));
+                }
             }
         }
 
         // Order the items by their keys
-        // TODO: this is overcomplicated, look for an easier way
-        sorted_items.sort_by_key(|item| item.0);
-        sorted_items.dedup_by_key(|item| item.0);
-        items.append(&mut sorted_items);
+        items.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
         items.reverse();
+        items.dedup_by(|a, b| a.0 == b.0);
 
         let items = items.into_iter().map(|item| item.1).collect();
 
@@ -241,14 +286,21 @@ impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
             return Err(Error::MaximumDepthReached);
         }
 
-        let key = {
-            if let Some(key) = self.next_key()? {
-                key
-            } else {
-                // Visit stash
-                let key = self.stash.next_key()?;
+        // We throw all keys away, except the last one
+        let mut last_key = None;
+        while let Some(key) = self.next_key()? {
+            last_key = Some(key);
+        }
 
-                match key {
+        let key = match last_key {
+            Some(key) => key,
+            None => {
+                // Visit stash
+                while let Some(key) = self.stash.next_key()? {
+                    last_key = Some(key)
+                }
+
+                match last_key {
                     Some(key) => key,
                     None => {
                         return Err(Error::EofReached);

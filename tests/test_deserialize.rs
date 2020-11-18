@@ -666,7 +666,7 @@ fn deserialize_sequence_key() {
 fn deserialize_sequence_key_ordered() {
     assert_eq!(
         from_str("value[10]=9&value[10]=10&value[1]=2&value[8]=8&value[2]=3&value[6]=7&value[0]=1&value[]=0"),
-        Ok(p!(vec![0, 1, 2, 3, 7, 8, 9]))
+        Ok(p!(vec![0, 1, 2, 3, 7, 8, 10]))
     );
 
     #[derive(Debug, Deserialize, PartialEq)]
@@ -680,7 +680,7 @@ fn deserialize_sequence_key_ordered() {
     // Keyed sequences are first come first serve
     assert_eq!(
         from_str("value[1][E][]=1&value[1][R][y]=2&value[1][E][]=2&value[1][R][x]=1"),
-        Ok(p!(vec![Anum::E(1, 2)]))
+        Ok(p!(vec![Anum::R { x: 1, y: 2 }]))
     );
 }
 
