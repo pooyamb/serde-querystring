@@ -12,6 +12,7 @@ pub(crate) struct PairMap<'de> {
     pairs: VecDeque<Pair<'de>>,
     value: Option<&'de [u8]>,
     stash: Stash<'de>,
+    remaining_depth: u16,
 }
 
 #[derive(Copy, Clone)]
@@ -58,11 +59,12 @@ impl<'a> PartialEq for KeyType<'a> {
 }
 
 impl<'de> PairMap<'de> {
-    pub(crate) fn new(remaining_depth: u16, pairs: VecDeque<Pair<'de>>) -> Self {
+    pub(crate) fn new(pairs: VecDeque<Pair<'de>>, remaining_depth: u16) -> Self {
         Self {
             pairs,
             value: None,
-            stash: Stash::new(remaining_depth),
+            stash: Stash::new(),
+            remaining_depth,
         }
     }
 
@@ -141,7 +143,13 @@ impl<'de> PairMap<'de> {
                 // Visit the stash
                 if key.is_empty() {
                     // If key is empty, then add it as a single map
-                    values.push((key, ItemKind::Map(self.stash.next_value_map()?)));
+                    values.push((
+                        key,
+                        ItemKind::Map(PairMap::new(
+                            self.stash.next_value()?,
+                            self.remaining_depth - 1,
+                        )),
+                    ));
                 } else if let Some((_, item)) = values.iter_mut().find(|item| item.0 == key) {
                     // If we already saw the key and it was a map, combine it with the previous map
                     // If it was a single value, just ignore this one
@@ -149,7 +157,13 @@ impl<'de> PairMap<'de> {
                         map.prepend(self.stash.next_value()?)
                     }
                 } else {
-                    values.push((key, ItemKind::Map(self.stash.next_value_map()?)));
+                    values.push((
+                        key,
+                        ItemKind::Map(PairMap::new(
+                            self.stash.next_value()?,
+                            self.remaining_depth - 1,
+                        )),
+                    ));
                 }
             }
         }
@@ -243,7 +257,7 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         K: de::DeserializeSeed<'de>,
     {
         // Calling next_value before next_key is an error, so we don't check the depth there
-        if self.stash.remaining_depth == 0 {
+        if self.remaining_depth == 0 {
             return Err(Error::MaximumDepthReached);
         }
 
@@ -266,7 +280,13 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
     {
         match self.next_value() {
             Ok(value) => seed.deserialize(&mut Value::new(value)),
-            _ => seed.deserialize(self.stash.next_value_map()?),
+            _ => {
+                // Time to visit the stash
+                seed.deserialize(PairMap::new(
+                    self.stash.next_value()?,
+                    self.remaining_depth - 1,
+                ))
+            }
         }
     }
 }
@@ -280,7 +300,7 @@ impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
         V: de::DeserializeSeed<'de>,
     {
         // Calling next_value before next_key is an error, so we don't check the depth there
-        if self.stash.remaining_depth == 0 {
+        if self.remaining_depth == 0 {
             return Err(Error::MaximumDepthReached);
         }
 
@@ -325,7 +345,13 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
     {
         match self.next_value() {
             Ok(value) => serde::de::Deserializer::deserialize_seq(&mut Value::new(value), visitor),
-            _ => visitor.visit_seq(&mut self.stash.next_value_map()?.into_seq()?),
+            _ => {
+                // Time to visit the stash
+                visitor.visit_seq(
+                    &mut PairMap::new(self.stash.next_value()?, self.remaining_depth - 1)
+                        .into_seq()?,
+                )
+            }
         }
     }
 
@@ -333,7 +359,13 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_map(self.stash.next_value_map()?)
+        match self.next_value() {
+            Ok(_) => Err(Error::InvalidMapValue),
+            _ => visitor.visit_map(PairMap::new(
+                self.stash.next_value()?,
+                self.remaining_depth - 1,
+            )),
+        }
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
@@ -342,7 +374,10 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
     {
         match self.next_value() {
             Ok(value) => seed.deserialize(&mut Value::new(value)),
-            _ => seed.deserialize(self.stash.next_value_map()?),
+            _ => seed.deserialize(PairMap::new(
+                self.stash.next_value()?,
+                self.remaining_depth - 1,
+            )),
         }
     }
 }

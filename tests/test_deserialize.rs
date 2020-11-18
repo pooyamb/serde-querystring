@@ -390,7 +390,7 @@ fn deserialize_recursion_overflow() {
 
     // An input of `a[a][a][a][a]=` is valid in this case, but as long as we stay below the recurstion limit
     let mut s = "a".to_string();
-    for _ in 0..63 {
+    for _ in 0..64 {
         s.push_str("[a]");
     }
     s.push_str("=");
@@ -398,7 +398,7 @@ fn deserialize_recursion_overflow() {
     assert!(from_str::<A>(&s).is_ok());
 
     let mut s = "a".to_string();
-    for _ in 0..64 {
+    for _ in 0..65 {
         s.push_str("[a]");
     }
     s.push_str("=");

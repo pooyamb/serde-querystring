@@ -8,6 +8,7 @@ mod seq;
 mod stash;
 mod value;
 
+use map::PairMap;
 use parser::{Pair, Parser};
 use stash::Stash;
 use value::Value;
@@ -22,7 +23,7 @@ impl<'de> Deserializer<'de> {
     pub fn new(slice: &'de [u8]) -> Self {
         Self {
             parser: Parser::new(slice),
-            stash: Stash::new(64),
+            stash: Stash::new(),
             value: None,
         }
     }
@@ -129,7 +130,10 @@ impl<'de> de::MapAccess<'de> for Deserializer<'de> {
     {
         match self.next_value() {
             Ok(value) => seed.deserialize(&mut Value::new(value)),
-            _ => seed.deserialize(self.stash.next_value_map()?),
+            _ => {
+                // Time to visit the stash
+                seed.deserialize(PairMap::new(self.stash.next_value()?, 64))
+            }
         }
     }
 }
