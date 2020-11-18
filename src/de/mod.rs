@@ -87,3 +87,19 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         i8 i16 i32 i64 u8 u16 u32 u64 f32 f64
     }
 }
+
+pub fn from_str<'de, T>(input: &'de str) -> Result<T>
+where
+    T: serde::de::Deserialize<'de>,
+{
+    let mut de = Deserializer::new(input.as_bytes());
+    serde::de::Deserialize::deserialize(&mut de)
+}
+
+pub fn from_bytes<'de, T>(input: &'de [u8]) -> Result<T>
+where
+    T: serde::de::Deserialize<'de>,
+{
+    let mut de = Deserializer::new(input);
+    serde::de::Deserialize::deserialize(&mut de)
+}
