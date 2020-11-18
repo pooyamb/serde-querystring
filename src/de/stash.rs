@@ -2,10 +2,7 @@ use std::collections::VecDeque;
 
 use crate::error::{Error, Result};
 
-mod map;
-mod seq;
-
-use map::PairMap;
+use super::map::PairMap;
 
 #[derive(Debug)]
 pub(crate) struct Pair<'de> {
@@ -21,8 +18,6 @@ pub(crate) struct Stash<'de> {
 
 impl<'de> Stash<'de> {
     pub(crate) fn new(remaining_depth: u16) -> Self {
-        // We also store remaining_depth here as we may go independent of main deserializer
-        // from here
         Self {
             pairs: VecDeque::new(),
             values: None,

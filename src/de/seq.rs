@@ -1,7 +1,7 @@
 use serde::de;
 
 use super::map::PairMap;
-use crate::de::Value;
+use super::Value;
 use crate::error::{Error, Result};
 
 pub(crate) enum ItemKind<'de> {

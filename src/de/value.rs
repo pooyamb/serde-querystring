@@ -3,7 +3,8 @@ use std::str;
 use serde::de::IntoDeserializer;
 use serde::{de, forward_to_deserialize_any};
 
-use super::{basis::Reference, parser::Parser, Error, Result};
+use super::parser::{Parser, Reference};
+use super::{Error, Result};
 
 pub(crate) struct Value<'de> {
     parser: Parser<'de>,
