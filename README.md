@@ -25,7 +25,7 @@ Existing alternatives don't cover some cases, for example enums (having enums in
 
 ## Warning
 
-It is not production ready in any way and is hardly even in alpha state.
+This project is in Alpha stage as of now, so use it at your own risk.
 
 Benchmarks provided may not be accurate and I'm not in any way qualified to write benchmarks. Feel free to open pull requests if you see a problem.
 
