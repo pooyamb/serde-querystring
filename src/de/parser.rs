@@ -537,6 +537,27 @@ impl<'de> Parser<'de> {
         )))
     }
 
+    pub(crate) fn parse_sequence_element(&mut self) -> Result<Option<&'de [u8]>> {
+        if self.done() {
+            return Ok(None);
+        }
+
+        let start_index = self.index;
+
+        while self.index < self.slice.len() {
+            match self.slice[self.index] {
+                b'&' | b';' | b',' => break,
+                _ => {
+                    self.index += 1;
+                }
+            }
+        }
+
+        let slice = &self.slice[start_index..self.index];
+        self.discard();
+        return Ok(Some(slice));
+    }
+
     pub(crate) fn done(&self) -> bool {
         self.index >= self.slice.len()
     }

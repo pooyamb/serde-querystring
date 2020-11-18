@@ -202,30 +202,10 @@ impl<'de> de::SeqAccess<'de> for Value<'de> {
             return Err(Error::NotSupportedAsValue);
         }
 
-        let mut index = self.parser.index;
-        let mut saw_delimiter = false;
-
-        while index < self.parser.slice.len() {
-            match self.parser.slice[index] {
-                b',' | b'&' | b';' => {
-                    saw_delimiter = true;
-                    break;
-                }
-                _ => {
-                    index += 1;
-                }
-            }
+        match self.parser.parse_sequence_element()? {
+            Some(slice) => seed.deserialize(&mut Value::new_flat(slice)).map(Some),
+            None => Ok(None),
         }
-
-        if !saw_delimiter && index == self.parser.index {
-            return Ok(None);
-        }
-
-        let slice = &self.parser.slice[self.parser.index..index];
-
-        self.parser.index = index + 1;
-
-        seed.deserialize(&mut Value::new_flat(slice)).map(Some)
     }
 }
 
