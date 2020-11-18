@@ -39,7 +39,8 @@ If you're looking for a more production ready alternative, consider looking at t
 
 ## Known bugs
 
-- Map values(and probably keys) can be themselves another map
+- Doesn't have correct error reporting yet
+- Not known(Please open issues)
 
 Tests only cover valid cases, so there can be some bugs here and there. If you face a bug [lease open an issue and let me know.
 
