@@ -1,7 +1,7 @@
 use serde::de;
 
 use super::map::PairMap;
-use super::Value;
+use super::{Parser, Value};
 use crate::error::{Error, Result};
 
 pub(crate) enum ItemKind<'de> {
@@ -27,7 +27,9 @@ impl<'de> de::SeqAccess<'de> for PairSeq<'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.items.pop() {
-            Some(ItemKind::Value(value)) => seed.deserialize(&mut Value::new(value)).map(Some),
+            Some(ItemKind::Value(value)) => seed
+                .deserialize(&mut Value::new(&mut Parser::new(value)))
+                .map(Some),
             Some(ItemKind::Map(map)) => seed.deserialize(map).map(Some),
             None => Ok(None),
         }

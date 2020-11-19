@@ -4,25 +4,25 @@ use serde::{de, forward_to_deserialize_any};
 use super::parser::{Parser, Reference};
 use super::{Error, Result};
 
-pub(crate) struct Value<'de> {
-    parser: Parser<'de>,
+pub(crate) struct Value<'de, 'a> {
+    parser: &'a mut Parser<'de>,
     scratch: Vec<u8>,
     // Only used for vectors, as we don't support vectors of vectors
     flat: bool,
 }
 
-impl<'de> Value<'de> {
-    pub(crate) fn new(slice: &'de [u8]) -> Self {
+impl<'de, 'a> Value<'de, 'a> {
+    pub(crate) fn new(parser: &'a mut Parser<'de>) -> Self {
         Self {
-            parser: Parser::new(slice),
+            parser,
             scratch: Vec::new(),
             flat: false,
         }
     }
 
-    pub(crate) fn new_flat(slice: &'de [u8]) -> Self {
+    pub(crate) fn new_flat(parser: &'a mut Parser<'de>) -> Self {
         Self {
-            parser: Parser::new(slice),
+            parser,
             scratch: Vec::new(),
             flat: true,
         }
@@ -71,7 +71,7 @@ macro_rules! deserialize_number {
     };
 }
 
-impl<'de> de::Deserializer<'de> for &mut Value<'de> {
+impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     type Error = Error;
 
     #[inline]
@@ -91,7 +91,6 @@ impl<'de> de::Deserializer<'de> for &mut Value<'de> {
                 Reference::Copied(s) => visitor.visit_str(s),
             },
         };
-        self.parser.discard();
         value
     }
 
@@ -108,7 +107,10 @@ impl<'de> de::Deserializer<'de> for &mut Value<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_seq(self)
+        if self.flat {
+            return Err(Error::NotSupportedAsValue);
+        }
+        visitor.visit_seq(SeqAccess::new(self))
     }
 
     #[inline]
@@ -116,7 +118,10 @@ impl<'de> de::Deserializer<'de> for &mut Value<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_seq(self)
+        if self.flat {
+            return Err(Error::NotSupportedAsValue);
+        }
+        visitor.visit_seq(SeqAccess::new(self))
     }
 
     #[inline]
@@ -191,25 +196,7 @@ impl<'de> de::Deserializer<'de> for &mut Value<'de> {
     deserialize_number!(deserialize_f64);
 }
 
-impl<'de> de::SeqAccess<'de> for Value<'de> {
-    type Error = Error;
-
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        if self.flat {
-            return Err(Error::NotSupportedAsValue);
-        }
-
-        match self.parser.parse_sequence_element()? {
-            Some(slice) => seed.deserialize(&mut Value::new_flat(slice)).map(Some),
-            None => Ok(None),
-        }
-    }
-}
-
-impl<'de> de::EnumAccess<'de> for &mut Value<'de> {
+impl<'de, 'a> de::EnumAccess<'de> for &mut Value<'de, 'a> {
     type Error = Error;
     type Variant = Self;
 
@@ -226,7 +213,7 @@ impl<'de> de::EnumAccess<'de> for &mut Value<'de> {
     }
 }
 
-impl<'de> de::VariantAccess<'de> for &mut Value<'de> {
+impl<'de, 'a> de::VariantAccess<'de> for &mut Value<'de, 'a> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
@@ -252,5 +239,44 @@ impl<'de> de::VariantAccess<'de> for &mut Value<'de> {
         T: de::DeserializeSeed<'de>,
     {
         Err(Error::NotSupportedAsValue)
+    }
+}
+
+pub(crate) struct SeqAccess<'de, 'a, 'b> {
+    value: &'b mut Value<'de, 'a>,
+    end: bool,
+}
+
+impl<'de, 'a, 'b> SeqAccess<'de, 'a, 'b> {
+    pub(crate) fn new(value: &'b mut Value<'de, 'a>) -> Self {
+        Self { value, end: false }
+    }
+}
+
+impl<'de, 'a, 'b> de::SeqAccess<'de> for SeqAccess<'de, 'a, 'b> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if self.end {
+            return Ok(None);
+        }
+        let res = match self.value.parser.parse_one_seq_value()? {
+            Some(slice) => seed
+                .deserialize(&mut Value::new_flat(&mut Parser::new(slice)))
+                .map(Some),
+            None => Ok(None),
+        };
+        match self.value.parser.peek()? {
+            None | Some(b'&') | Some(b';') => {
+                self.value.parser.discard();
+                self.end = true
+            }
+            Some(b',') => self.value.parser.discard(),
+            _ => {}
+        };
+        res
     }
 }

@@ -11,11 +11,11 @@ macro_rules! overflow {
 }
 
 #[inline]
-pub(crate) fn parse_char(high: u8, low: u8) -> Result<u8> {
-    let high = char::from(high)
+pub(crate) fn parse_char(bytes: &[u8]) -> Result<u8> {
+    let high = char::from(bytes[0])
         .to_digit(16)
         .ok_or(Error::InvalidCharacter)?;
-    let low = char::from(low)
+    let low = char::from(bytes[1])
         .to_digit(16)
         .ok_or(Error::InvalidCharacter)?;
     Ok(high as u8 * 0x10 + low as u8)
@@ -84,17 +84,15 @@ impl<'de> Parser<'de> {
                 b'%' => {
                     // we saw percentage
                     scratch.extend_from_slice(&self.slice[start..self.index]);
+                    self.discard();
 
-                    if self.slice.len() < self.index + 2 {
+                    if self.slice.len() < self.index + 1 {
                         return Err(Error::EofReached);
                     }
 
-                    scratch.push(parse_char(
-                        self.slice[(self.index + 1)],
-                        self.slice[(self.index + 2)],
-                    )?);
+                    scratch.push(parse_char(&self.slice[(self.index)..=(self.index + 1)])?);
 
-                    self.index += 3;
+                    self.index += 2;
                     start = self.index;
                 }
                 _ => {
@@ -105,9 +103,11 @@ impl<'de> Parser<'de> {
 
         if scratch.is_empty() {
             let borrowed = &self.slice[start..self.index];
+            self.discard();
             result(self, borrowed).map(Reference::Borrowed)
         } else {
             scratch.extend_from_slice(&self.slice[start..self.index]);
+            self.discard();
             result(self, scratch).map(Reference::Copied)
         }
     }
@@ -404,38 +404,44 @@ impl<'de> Parser<'de> {
             }
         }
 
+        if let Some(b';') | Some(b'&') = self.peek()? {
+            self.discard()
+        }
+
         Ok(())
     }
 
     pub(crate) fn parse_bool(&mut self) -> Result<bool> {
-        match self.peek()? {
+        match self.next()? {
             Some(b't') => {
-                self.discard();
                 self.parse_ident(b"rue")?;
                 Ok(true)
             }
             Some(b'f') => {
-                self.discard();
                 self.parse_ident(b"alse")?;
                 Ok(false)
             }
-            Some(b'o') => {
-                self.discard();
-                match self.next()? {
-                    Some(b'n') => Ok(true),
-                    Some(b'f') => {
-                        self.parse_ident(b"f")?;
-                        Ok(false)
-                    }
-                    _ => Err(Error::InvalidIdent),
+            Some(b'o') => match self.peek()? {
+                Some(b'n') => {
+                    self.parse_ident(b"n")?;
+                    Ok(true)
                 }
-            }
+                Some(b'f') => {
+                    self.parse_ident(b"ff")?;
+                    Ok(false)
+                }
+                _ => Err(Error::EofReached),
+            },
             Some(b'0') => {
-                self.discard();
+                if let Some(b';') | Some(b'&') = self.peek()? {
+                    self.discard()
+                }
                 Ok(false)
             }
             Some(b'1') => {
-                self.discard();
+                if let Some(b';') | Some(b'&') = self.peek()? {
+                    self.discard()
+                }
                 Ok(true)
             }
             Some(_) => Err(Error::InvalidIdent),
@@ -443,7 +449,7 @@ impl<'de> Parser<'de> {
         }
     }
 
-    pub(crate) fn parse_subpair(&mut self, start_index: usize) -> Result<Option<Pair<'de>>> {
+    fn parse_subpair(&mut self, start_index: usize, stash: &mut super::Stash<'de>) -> Result<()> {
         if start_index + 1 > self.slice.len() {
             return Err(Error::EofReached);
         }
@@ -481,18 +487,17 @@ impl<'de> Parser<'de> {
             }
         }
 
-        let res = Pair::Sub(
+        stash.add(
             &self.slice[self.index..start_index],
             &self.slice[(start_index + 1)..key_index],
             &self.slice[(key_index + 1)..value_index],
         );
 
         self.index = value_index + 1;
-
-        Ok(Some(res))
+        Ok(())
     }
 
-    pub(crate) fn parse_pair(&mut self) -> Result<Option<Pair<'de>>> {
+    pub(crate) fn parse_key(&mut self, stash: &mut super::Stash<'de>) -> Result<Option<&'de [u8]>> {
         // Parse key
         let mut key_found = false;
         let mut key_index = self.index;
@@ -504,7 +509,8 @@ impl<'de> Parser<'de> {
                 }
                 b'[' => {
                     // It's a subkey
-                    return self.parse_subpair(key_index);
+                    self.parse_subpair(key_index, stash)?;
+                    key_index = self.index;
                 }
                 _ => {
                     key_index += 1;
@@ -516,28 +522,12 @@ impl<'de> Parser<'de> {
             return Ok(None);
         }
         let key = &self.slice[self.index..key_index];
+        self.index = key_index + 1;
 
-        let mut value_index = key_index + 1;
-        while value_index < self.slice.len() {
-            match self.slice[value_index] {
-                b';' | b'&' => {
-                    break;
-                }
-                _ => {
-                    value_index += 1;
-                }
-            }
-        }
-
-        self.index = value_index + 1;
-
-        Ok(Some(Pair::Root(
-            key,
-            &self.slice[(key_index + 1)..value_index],
-        )))
+        Ok(Some(key))
     }
 
-    pub(crate) fn parse_sequence_element(&mut self) -> Result<Option<&'de [u8]>> {
+    pub(crate) fn parse_one_seq_value(&mut self) -> Result<Option<&'de [u8]>> {
         if self.done() {
             return Ok(None);
         }
@@ -554,7 +544,6 @@ impl<'de> Parser<'de> {
         }
 
         let slice = &self.slice[start_index..self.index];
-        self.discard();
         return Ok(Some(slice));
     }
 
@@ -596,11 +585,6 @@ pub static POW10: [f64; 309] = [
     1e290, 1e291, 1e292, 1e293, 1e294, 1e295, 1e296, 1e297, 1e298, 1e299, //
     1e300, 1e301, 1e302, 1e303, 1e304, 1e305, 1e306, 1e307, 1e308,
 ];
-
-pub(crate) enum Pair<'de> {
-    Root(&'de [u8], &'de [u8]),
-    Sub(&'de [u8], &'de [u8], &'de [u8]),
-}
 
 pub(crate) enum ReaderNumber {
     F64(f64),

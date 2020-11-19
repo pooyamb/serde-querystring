@@ -5,7 +5,7 @@ use serde::{de, forward_to_deserialize_any};
 
 use super::seq::{ItemKind, PairSeq};
 use super::stash::{Pair, Stash};
-use super::Value;
+use super::{Parser, Value};
 use crate::error::{Error, Result};
 
 pub(crate) struct PairMap<'de> {
@@ -178,7 +178,8 @@ impl<'de> PairMap<'de> {
             if key.is_empty() {
                 items.push((KeyType::None, value))
             } else {
-                let index: Result<u16> = serde::de::Deserialize::deserialize(&mut Value::new(key));
+                let index: Result<u16> =
+                    serde::de::Deserialize::deserialize(&mut Value::new(&mut Parser::new(key)));
                 if let Ok(index) = index {
                     items.push((KeyType::Number(index), value));
                 } else {
@@ -262,14 +263,18 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         }
 
         if let Some(key) = self.next_key()? {
-            return seed.deserialize(&mut Value::new(key)).map(Some);
+            return seed
+                .deserialize(&mut Value::new(&mut Parser::new(key)))
+                .map(Some);
         }
 
         // Visit stash
         let key = self.stash.next_key()?;
 
         match key {
-            Some(key) => seed.deserialize(&mut Value::new(key)).map(Some),
+            Some(key) => seed
+                .deserialize(&mut Value::new(&mut Parser::new(key)))
+                .map(Some),
             None => Ok(None),
         }
     }
@@ -279,7 +284,7 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         V: de::DeserializeSeed<'de>,
     {
         match self.next_value() {
-            Ok(value) => seed.deserialize(&mut Value::new(value)),
+            Ok(value) => seed.deserialize(&mut Value::new(&mut Parser::new(value))),
             _ => {
                 // Time to visit the stash
                 seed.deserialize(PairMap::new(
@@ -327,7 +332,10 @@ impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
             }
         };
 
-        Ok((seed.deserialize(&mut Value::new(key))?, self))
+        Ok((
+            seed.deserialize(&mut Value::new(&mut Parser::new(key)))?,
+            self,
+        ))
     }
 }
 
@@ -344,7 +352,10 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
         V: de::Visitor<'de>,
     {
         match self.next_value() {
-            Ok(value) => serde::de::Deserializer::deserialize_seq(&mut Value::new(value), visitor),
+            Ok(value) => serde::de::Deserializer::deserialize_seq(
+                &mut Value::new(&mut Parser::new(value)),
+                visitor,
+            ),
             _ => {
                 // Time to visit the stash
                 visitor.visit_seq(
@@ -373,7 +384,7 @@ impl<'de> de::VariantAccess<'de> for &mut PairMap<'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.next_value() {
-            Ok(value) => seed.deserialize(&mut Value::new(value)),
+            Ok(value) => seed.deserialize(&mut Value::new(&mut Parser::new(value))),
             _ => seed.deserialize(PairMap::new(
                 self.stash.next_value()?,
                 self.remaining_depth - 1,
