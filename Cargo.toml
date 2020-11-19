@@ -6,6 +6,7 @@ description = "A query string deserializer based on serde"
 edition = "2018"
 readme = "README.md"
 repository = "https://github.com/pooyamb/serde-querystring/"
+documentation = "https://docs.rs/serde-querystring"
 license = "MIT OR Apache-2.0"
 keywords = ["serialization", "deserialization", "querystring", "serde"]
 categories = ["encoding", "web-programming"]
