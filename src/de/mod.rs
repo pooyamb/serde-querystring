@@ -26,9 +26,9 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    // pub fn as_value(&self) -> Value<'de> {
-    //     Value{}
-    // }
+    pub fn is_finished(&self) -> bool {
+        self.parser.done()
+    }
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
@@ -124,7 +124,12 @@ where
     T: serde::de::Deserialize<'de>,
 {
     let mut de = Deserializer::new(input.as_bytes());
-    serde::de::Deserialize::deserialize(&mut de)
+    let res = serde::de::Deserialize::deserialize(&mut de)?;
+    if !de.is_finished() {
+        Err(Error::EofReached)
+    } else {
+        Ok(res)
+    }
 }
 
 pub fn from_bytes<'de, T>(input: &'de [u8]) -> Result<T>
@@ -132,5 +137,10 @@ where
     T: serde::de::Deserialize<'de>,
 {
     let mut de = Deserializer::new(input);
-    serde::de::Deserialize::deserialize(&mut de)
+    let res = serde::de::Deserialize::deserialize(&mut de)?;
+    if !de.is_finished() {
+        Err(Error::EofReached)
+    } else {
+        Ok(res)
+    }
 }
