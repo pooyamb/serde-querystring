@@ -58,9 +58,8 @@ If you're looking for a more production ready alternative, consider looking at t
 - Doesn't support unit types
 - Doesn't check if it visited all the input when visiting subkeys
 - Doesn't support sequence of key-values at root(More of a feature)
-- Not known(Please open issues)
 
-Tests only cover valid cases, so there can be some bugs here and there. If you face a bug [lease open an issue and let me know.
+Tests only cover valid querystrings in some cases, so there can be some bugs here and there. If you face a bug, please open an issue and let me know.
 
 ## Credit
 
