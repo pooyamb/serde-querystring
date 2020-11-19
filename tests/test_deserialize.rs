@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, HashMap};
 use serde::Deserialize;
 use serde_querystring::from_str;
 
+/// It is a helper struct we use to test primitive types
+/// as we don't support anything beside maps/structs at the root level
 #[derive(Debug, PartialEq, Deserialize)]
 struct Primitive<T> {
     value: T,
@@ -20,52 +22,191 @@ macro_rules! p {
     };
 }
 
+/// Check if all integer types are deserialized
 #[test]
-fn deserialize_primitive_types() {
-    assert_eq!(from_str("value=-2500000"), Ok(p!(-2_500_000)));
-    assert_eq!(from_str("value=2500000"), Ok(p!(2_500_000)));
-    assert_eq!(from_str("value=test"), Ok(p!("test".to_string())));
-    assert_eq!(from_str("value=test"), Ok(p!("test")));
-    assert_eq!(from_str("value=250"), Ok(p!("250".to_string())));
-    assert_eq!(from_str("value=-25"), Ok(p!("-25".to_string())));
-    assert_eq!(from_str("value=-1.2222"), Ok(p!(-1.2222)));
-    assert_eq!(from_str("value=1.2222"), Ok(p!(1.2222)));
+fn deserialize_integer_valid() {
+    // u8
+    assert_eq!(from_str("value=255"), Ok(p!(255_u8)));
+    assert_eq!(from_str("value=0"), Ok(p!(0_u8)));
+
+    // i8
+    assert_eq!(from_str("value=127"), Ok(p!(127_i8)));
+    assert_eq!(from_str("value=-128"), Ok(p!(-128_i8)));
+
+    // u16
+    assert_eq!(from_str("value=65535"), Ok(p!(65535_u16)));
+    assert_eq!(from_str("value=0"), Ok(p!(0_u16)));
+
+    // i16
+    assert_eq!(from_str("value=32767"), Ok(p!(32767_i16)));
+    assert_eq!(from_str("value=-32768"), Ok(p!(-32768_i16)));
+
+    // u32
+    assert_eq!(from_str("value=4294967295"), Ok(p!(4294967295_u32)));
+    assert_eq!(from_str("value=0"), Ok(p!(0_u32)));
+
+    // i32
+    assert_eq!(from_str("value=2147483647"), Ok(p!(2147483647_i32)));
+    assert_eq!(from_str("value=-2147483648"), Ok(p!(-2147483648_i32)));
+
+    // u64
+    assert_eq!(
+        from_str("value=18446744073709551615"),
+        Ok(p!(18446744073709551615_u64))
+    );
+    assert_eq!(from_str("value=0"), Ok(p!(0_u64)));
+
+    // i64
+    assert_eq!(
+        from_str("value=9223372036854775807"),
+        Ok(p!(9223372036854775807_i64))
+    );
+    assert_eq!(
+        from_str("value=-9223372036854775808"),
+        Ok(p!(-9223372036854775808_i64))
+    );
 }
 
+/// Check integers overflow
+#[test]
+fn deserialize_integer_invalid() {
+    // u8
+    assert!(from_str::<u8>("value=-10").is_err());
+    assert!(from_str::<u8>("value=260").is_err());
+
+    // i8
+    assert!(from_str::<i8>("value=255").is_err());
+    assert!(from_str::<i8>("value=-200").is_err());
+
+    // u16
+    assert!(from_str::<u16>("value=65537").is_err());
+    assert!(from_str::<u16>("value=-200").is_err());
+
+    // i16
+    assert!(from_str::<i16>("value=32768").is_err());
+    assert!(from_str::<i16>("value=-32769").is_err());
+
+    // u32
+    assert!(from_str::<u32>("value=4294967296").is_err());
+    assert!(from_str::<u32>("value=-200").is_err());
+
+    // i32
+    assert!(from_str::<i32>("value=2147483648").is_err());
+    assert!(from_str::<i32>("value=-2147483649").is_err());
+
+    // u64
+    assert!(from_str::<u64>("value=18446744073709551616").is_err());
+    assert!(from_str::<u64>("value=-200").is_err());
+
+    // i64
+    assert!(from_str::<i64>("value=9223372036854775808").is_err());
+    assert!(from_str::<i64>("value=-9223372036854775809").is_err());
+
+    // invalid for integer
+    assert!(from_str::<i64>("value=1.5").is_err());
+    assert!(from_str::<i64>("value=-1.5").is_err());
+    assert!(from_str::<i64>("value=1.2E3").is_err());
+    assert!(from_str::<i64>("value=1.2E-3").is_err());
+}
+
+/// Check if normal/exponential floats work
+#[test]
+fn deserialize_float_valid() {
+    assert_eq!(from_str("value=1.2"), Ok(p!(1.2_f64)));
+    assert_eq!(from_str("value=-1.2"), Ok(p!(-1.2_f64)));
+    assert_eq!(from_str("value=1.2E5"), Ok(p!(1.2E5_f64)));
+    assert_eq!(from_str("value=-1.2E5"), Ok(p!(-1.2E5_f64)));
+    assert_eq!(from_str("value=1.2E+5"), Ok(p!(1.2E5_f64)));
+    assert_eq!(from_str("value=-1.2E+5"), Ok(p!(-1.2E5_f64)));
+    assert_eq!(from_str("value=1.2E-5"), Ok(p!(1.2E-5_f64)));
+    assert_eq!(from_str("value=-1.2E-5"), Ok(p!(-1.2E-5_f64)));
+    assert_eq!(
+        from_str("value=9223372036854775808"),
+        Ok(p!(9223372036854775808_f64))
+    );
+    assert_eq!(
+        from_str("value=-9223372036854775809"),
+        Ok(p!(-9223372036854775809_f64))
+    );
+}
+
+/// Check invalid strings as numbers
+#[test]
+fn deserialize_float_invalid() {
+    assert!(from_str::<f64>("value=number").is_err());
+    assert!(from_str::<f64>("value=-1.5num").is_err());
+    assert!(from_str::<f64>("value=&").is_err());
+    assert!(from_str::<f64>("value=1.0a1.0").is_err());
+}
+
+/// Check if different boolean idents work
 #[test]
 fn deserialize_bool() {
+    // true
     assert_eq!(from_str("value=1"), Ok(p!(true)));
     assert_eq!(from_str("value=on"), Ok(p!(true)));
     assert_eq!(from_str("value=true"), Ok(p!(true)));
+
+    // false
     assert_eq!(from_str("value=0"), Ok(p!(false)));
     assert_eq!(from_str("value=off"), Ok(p!(false)));
     assert_eq!(from_str("value=false"), Ok(p!(false)));
+
+    // invalid
     assert!(from_str::<Primitive<bool>>("value=bla").is_err());
+    assert!(from_str::<Primitive<bool>>("value=0off").is_err());
+    assert!(from_str::<Primitive<bool>>("value=of").is_err());
+    assert!(from_str::<Primitive<bool>>("value=onoff").is_err());
 }
 
 #[test]
-fn deserialize_unit_type() {
-    assert_eq!(from_str(""), Ok(()));
-    assert_eq!(from_str("&"), Ok(()));
-    assert_eq!(from_str("&&"), Ok(()));
-    assert_eq!(from_str("&&&"), Ok(()));
+fn deserialize_strings() {
+    assert_eq!(from_str("value=test"), Ok(p!("test".to_string())));
+    assert_eq!(from_str("value=test"), Ok(p!("test")));
+    assert_eq!(from_str("value=250"), Ok(p!("250")));
+    assert_eq!(from_str("value=-25"), Ok(p!("-25")));
+
+    // percentage decoded
+    assert_eq!(
+        from_str("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
+        Ok(p!("بابابزرگ".to_string()))
+    );
+
+    // We can't visit percent decoded strings as &str
+    assert!(
+        from_str::<Primitive<&str>>("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF")
+            .is_err()
+    );
+
+    // Plus in strings should be replaced with space
+    assert_eq!(from_str("value=rum+rum"), Ok(p!("rum rum".to_string())));
+
+    // We can't visit strings with plus as &str
+    assert!(from_str::<Primitive<&str>>("value=rum+rum").is_err());
+
+    // Check if strings don't pass the &
+    let mut map = HashMap::new();
+    map.insert("num".to_string(), "rum rum".to_string());
+    map.insert("yum".to_string(), "ehem ehem".to_string());
+    assert_eq!(from_str("num=rum+rum&yum=ehem+ehem"), Ok(map));
+
+    let mut map = HashMap::new();
+    map.insert("baba".to_string(), "بابابزرگ".to_string());
+    map.insert("amoo".to_string(), "عمو نوروز".to_string());
+    assert_eq!(
+        from_str(
+            "baba=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF&\
+            amoo=%D8%B9%D9%85%D9%88%20%D9%86%D9%88%D8%B1%D9%88%D8%B2"
+        ),
+        Ok(map)
+    );
 }
 
-// #[test]
-// fn deserialize_with_extra_unit_chars() {
-//     assert_eq!(from_str("&value=200"), Ok(((), p!(200))));
-//     assert_eq!(from_str("&&value=-200"), Ok(((), (), p!(-200))));
-//     assert_eq!(
-//         from_str("&&value=test"),
-//         Ok(((), (), p!("test".to_string())))
-//     );
-// }
-
+/// Check if sequence as values work
 #[test]
-fn deserialize_tuple() {
+fn deserialize_value_sequence() {
+    // Tuples
     assert_eq!(from_str("value=12,3,4"), Ok(p!((12, 3, 4))));
-    assert_eq!(from_str("value=12,3,4,32"), Ok(p!((12, 3, 4))));
-
     assert_eq!(
         from_str("value=hallo,hello,hi"),
         Ok(p!((
@@ -74,13 +215,93 @@ fn deserialize_tuple() {
             "hi".to_string()
         )))
     );
+
+    // Vectors
+    assert_eq!(from_str("value=12,3,4"), Ok(p!(vec![12, 3, 4])));
     assert_eq!(
-        from_str("value=hallo,hello,hi,bla"),
-        Ok(p!((
-            "hallo".to_string(),
-            "hello".to_string(),
-            "hi".to_string()
-        )))
+        from_str("value=hallo,hello,hi"),
+        Ok(p!(vec!["hallo", "hello", "hi"]))
+    );
+
+    // Check if percentage decoded values don't pass ,
+    assert_eq!(
+        from_str(
+            "value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF+,\
+            %D8%B9%D9%85%D9%88+%D9%86%D9%88%D8%B1%D9%88%D8%B2,\
+            %D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"
+        ),
+        Ok(p!(vec![
+            "بابابزرگ ".to_string(),
+            "عمو نوروز".to_string(),
+            "بابابزرگ".to_string()
+        ]))
+    );
+
+    // Tuples with extra values should not work
+    assert!(from_str::<Primitive<(i32, i32, i32)>>("value=12,3,4,32").is_err());
+    assert!(from_str::<Primitive<(&str, &str, &str)>>("value=hallo,hello,hi,bla").is_err());
+
+    // We don't support sequences of sequences(may support in future for tuples)
+    assert!(from_str::<Primitive<((i32, i32), (i32, i32))>>("value=12,3,4,32").is_err());
+    assert!(from_str::<Primitive<Vec<Vec<i32>>>>("value=12,3,4,32").is_err());
+}
+
+#[test]
+fn deserialize_new_type() {
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
+    struct NewType(i32);
+
+    assert_eq!(from_str("value=-2500000"), Ok(p!(NewType(-2_500_000))));
+}
+
+/// Check if unit enums work as keys, values and sequence as values
+#[test]
+fn deserialize_unit_enums() {
+    // as key
+    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
+    enum Side {
+        Left,
+        Right,
+        God,
+    }
+
+    assert_eq!(from_str("value=God"), Ok(p!(Side::God)));
+
+    let mut map = HashMap::new();
+    map.insert(Side::God, "winner");
+    map.insert(Side::Right, "looser");
+    assert_eq!(from_str("God=winner&Right=looser"), Ok(map));
+
+    // as value
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct A {
+        looser: Side,
+        winner: Side,
+    }
+    assert_eq!(
+        from_str::<A>("looser=Left&winner=God"),
+        Ok(A {
+            looser: Side::Left,
+            winner: Side::God
+        })
+    );
+
+    // as subkey or sub value
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct B {
+        sides: Vec<Side>,
+        result: HashMap<Side, i32>,
+    }
+    let mut map = HashMap::new();
+    map.insert(Side::God, 10);
+    map.insert(Side::Right, -1);
+    map.insert(Side::Left, -1);
+    assert_eq!(
+        from_str::<B>("sides=God,Left,Right&result[God]=10&result[Right]=-1&result[Left]=-1"),
+        Ok(B {
+            sides: vec![Side::God, Side::Left, Side::Right],
+            result: map
+        })
     );
 }
 
@@ -95,52 +316,51 @@ fn deserialize_map() {
 }
 
 #[test]
-fn deserialize_without_and() {
-    assert!(from_str::<HashMap<String, i32>>("key1=321key2=123key3=7").is_err());
-
-    let mut map = HashMap::new();
-    map.insert("key1".to_string(), "321key2=123key3=7".to_string());
-    assert_eq!(
-        from_str::<HashMap<String, String>>("key1=321key2=123key3=7"),
-        Ok(map)
-    );
-}
-
-#[test]
-fn deserialize_new_type() {
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    struct NewType(i32);
-
-    assert_eq!(from_str("value=-2500000"), Ok(p!(NewType(-2_500_000))));
-}
-
-#[test]
-fn deserialize_struct() {
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    struct Sample {
-        neg_num: i32,
-        num: u8,
-        string: String,
-        boolean: bool,
-        special_bool: bool,
+fn deserialize_map_of_maps() {
+    fn hashmap_it<T>(t: T) -> HashMap<String, T> {
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), t);
+        map
     }
 
-    let s = Sample {
-        neg_num: -2500,
-        num: 123,
-        string: "Hello".to_string(),
-        boolean: true,
-        special_bool: false,
-    };
+    let mut map = HashMap::new();
+    map.insert("key".to_string(), "value".to_string());
 
-    assert_eq!(
-        from_str::<Sample>("neg_num=-2500&num=123&string=Hello&boolean=on&special_bool=false"),
-        Ok(s)
-    );
+    // 10 times
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+
+    // 10 more times
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+    let map = hashmap_it(map);
+
+    let deserialized = from_str(
+        "key[key][key][key][key][key][key][key][key][key][key][key]\
+        [key][key][key][key][key][key][key][key][key]=value",
+    )
+    .unwrap();
+
+    assert_eq!(map, deserialized);
 }
 
 #[test]
-fn deserialize_repeated_keys() {
+fn deserialize_map_with_repeated_keys() {
     let mut map = HashMap::new();
     map.insert("num".to_string(), -2501);
     assert_eq!(
@@ -149,71 +369,60 @@ fn deserialize_repeated_keys() {
     );
 }
 
+/// We already tested simple structs in all primitive value tests, check if multiple fields
+/// of different values also work and don't overflow on each other
 #[test]
-fn deserialize_plus_to_space() {
-    let mut map = HashMap::new();
-    map.insert("num".to_string(), "rum rum".to_string());
-    map.insert("yum".to_string(), "ehem ehem".to_string());
-    assert_eq!(
-        from_str::<HashMap<String, String>>("num=rum+rum&yum=ehem+ehem"),
-        Ok(map)
-    );
-}
-
-#[test]
-fn deserialize_percentage_decoding() {
-    let mut map = HashMap::new();
-    map.insert("baba".to_string(), "بابابزرگ".to_string());
-    map.insert("amoo".to_string(), "عمو نوروز".to_string());
-    assert_eq!(
-        from_str::<HashMap<String, String>>(
-            "baba=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF&\
-            amoo=%D8%B9%D9%85%D9%88%20%D9%86%D9%88%D8%B1%D9%88%D8%B2"
-        ),
-        Ok(map)
-    );
-}
-
-#[test]
-fn deserialize_percentage_decoding_raw() {
-    assert_eq!(
-        from_str("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
-        Ok(p!("بابابزرگ".to_string()))
-    );
-}
-
-// It should be here, but it is not to keep the same behaviour as serde_urlencoded
-// #[test]
-// fn deserialize_percentage_invalid() {
-//     assert!(from_str::<String>("%00%01%11").is_err());
-// }
-
-#[test]
-fn deserialize_struct_with_non_primitive_chilren() {
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    struct HumanAge(u8);
-
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    struct Human {
-        abblities: Vec<String>,
-        favs: (i32, i32, i32),
-        age: HumanAge,
+fn deserialize_struct() {
+    #[derive(Debug, serde::Serialize, Deserialize, Eq, PartialEq)]
+    struct Sample<'a> {
+        neg_num: i32,
+        num: u8,
+        string: String,
+        strings: Vec<String>,
+        #[serde(borrow)]
+        one_str: &'a str,
+        #[serde(borrow)]
+        strs: Vec<&'a str>,
+        #[serde(borrow)]
+        strs_tuple: (&'a str, &'a str, &'a str),
+        boolean: bool,
+        booleans: Vec<bool>,
     }
 
-    let human = Human {
-        abblities: vec!["eats".to_string(), "reads".to_string(), "cries".to_string()],
-        favs: (1, 2, 3),
-        age: HumanAge(69),
+    let s = Sample {
+        neg_num: -2500,
+        num: 123,
+        one_str: "HiBabe",
+        string: "بابابزرگ &".to_string(),
+        strings: vec![
+            "بابابزرگ ".to_string(),
+            "عمو نوروز,".to_string(),
+            "بابابزرگ&".to_string(),
+        ],
+        strs: vec!["Hello", "World", "Its", "Me"],
+        strs_tuple: ("Hello", "World", "ITSME"),
+        boolean: true,
+        booleans: vec![false, true, false, true, false, true, false],
     };
 
     assert_eq!(
-        from_str::<Human>("favs=1,2,3&abblities=eats,reads,cries&age=69"),
-        Ok(human)
+        from_str::<Sample>(
+            "neg_num=-2500&\
+            string=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF+%26&\
+            strings=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF+,\
+            %D8%B9%D9%85%D9%88+%D9%86%D9%88%D8%B1%D9%88%D8%B2%2C,\
+            %D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF%26&\
+            one_str=HiBabe&strs=Hello,World,Its,Me&\
+            strs_tuple=Hello,World,ITSME&\
+            boolean=true&booleans=false,true,off,on,0,1,false&\
+            num=123"
+        ),
+        Ok(s)
     );
 }
 
 #[test]
-fn deserialize_struct_with_struct_chilren() {
+fn deserialize_struct_of_structs() {
     #[derive(Debug, Deserialize, Eq, PartialEq)]
     struct Book {
         pages: usize,
@@ -266,223 +475,7 @@ fn deserialize_struct_with_struct_chilren() {
 }
 
 #[test]
-fn deserialize_so_many_levels() {
-    fn hashmap_it<T>(t: T) -> HashMap<String, T> {
-        let mut map = HashMap::new();
-        map.insert("key".to_string(), t);
-        map
-    }
-
-    let mut map = HashMap::new();
-    map.insert("key".to_string(), "value".to_string());
-
-    // 10 times
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-
-    // 10 more times
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-    let map = hashmap_it(map);
-
-    let deserialized = from_str(
-        "key[key][key][key][key][key][key][key][key][key][key][key]\
-        [key][key][key][key][key][key][key][key][key]=value",
-    )
-    .unwrap();
-
-    assert_eq!(map, deserialized);
-}
-
-#[test]
-fn deserialize_tuple_key() {
-    #[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
-    struct Point(i32, i32, i32);
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct Sample {
-        weight: HashMap<Point, i32>,
-    };
-
-    let mut weight = HashMap::new();
-    weight.insert(Point(1, 1, 1), 1200);
-    weight.insert(Point(2, 2, 2), 2400);
-
-    let res = Ok(Sample { weight });
-
-    assert_eq!(from_str("weight[1,1,1]=1200&weight[2,2,2]=2400"), res);
-
-    // This should also work as we ignore everything after the last ,
-    assert_eq!(from_str("weight[1,1,1,1]=1200&weight[2,2,2,2]=2400"), res);
-
-    // The same with strings
-    #[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
-    struct PointString(String, String, String);
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct SampleString {
-        weight: HashMap<PointString, String>,
-    };
-
-    let mut weight = HashMap::new();
-    weight.insert(
-        PointString("1a".to_string(), "1a".to_string(), "1a".to_string()),
-        "big".to_string(),
-    );
-    weight.insert(
-        PointString("2a".to_string(), "2a".to_string(), "2a".to_string()),
-        "small".to_string(),
-    );
-
-    let res = Ok(SampleString { weight });
-
-    assert_eq!(from_str("weight[1a,1a,1a]=big&weight[2a,2a,2a]=small"), res);
-
-    // This should also work as we ignore everything after the last ,
-    assert_eq!(
-        from_str("weight[1a,1a,1a,1a]=big&weight[2a,2a,2a,2a]=small"),
-        res
-    );
-}
-
-// We don't support these kind of recursive structures
-#[test]
-fn deserialize_invalid_recursion() {
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
-    struct A {
-        a: BTreeMap<i32, A>,
-    };
-
-    assert!(from_str::<A>("a[2]=a[2]=").is_err());
-
-    #[derive(Debug, Clone, Deserialize)]
-    struct A2(Vec<A2>);
-
-    assert!(from_str::<Primitive<A2>>("value=1,1,1").is_err())
-}
-
-#[test]
-fn deserialize_recursion_overflow() {
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
-    struct B {
-        a: Box<Option<B>>,
-    };
-
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
-    struct A {
-        a: B,
-    };
-
-    // An input of `a[a][a][a][a]=` is valid in this case, but as long as we stay below the recurstion limit
-    let mut s = "a".to_string();
-    for _ in 0..64 {
-        s.push_str("[a]");
-    }
-    s.push_str("=");
-
-    assert!(from_str::<A>(&s).is_ok());
-
-    let mut s = "a".to_string();
-    for _ in 0..65 {
-        s.push_str("[a]");
-    }
-    s.push_str("=");
-
-    assert!(from_str::<A>(&s).is_err());
-}
-
-#[test]
-fn deserialize_number_overflow() {
-    let max_u32_plus_1 = (u32::max_value() as i64) + 1;
-    assert!(from_str::<Primitive<u32>>(&format!("value={}", max_u32_plus_1)).is_err());
-
-    let max_i32_neg_minus_one = -(max_u32_plus_1 / 2) - 1;
-    assert!(from_str::<Primitive<i32>>(&format!("value={}", max_i32_neg_minus_one)).is_err());
-
-    assert!(from_str::<Primitive<u64>>("value=18446744073709551616").is_err());
-
-    assert!(from_str::<Primitive<i64>>("value=-9223372036854775809").is_err());
-
-    assert_eq!(
-        from_str("value=18446744073709551616"),
-        Ok(p!(18446744073709551616_f64))
-    );
-    assert_eq!(
-        from_str("value=-18446744073709551616"),
-        Ok(p!(-18446744073709551616_f64))
-    );
-}
-
-#[test]
-fn deserialize_unit_enums() {
-    // as key
-    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-    enum Side {
-        Left,
-        Right,
-        God,
-    }
-
-    assert_eq!(from_str("value=God"), Ok(p!(Side::God)));
-
-    let mut map = HashMap::new();
-    map.insert(Side::God, "winner");
-    map.insert(Side::Right, "looser");
-    assert_eq!(
-        from_str::<HashMap<Side, &str>>("God=winner&Right=looser"),
-        Ok(map)
-    );
-
-    // as value
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct A {
-        looser: Side,
-        winner: Side,
-    }
-    assert_eq!(
-        from_str::<A>("looser=Left&winner=God"),
-        Ok(A {
-            looser: Side::Left,
-            winner: Side::God
-        })
-    );
-
-    // as subkey or sub value
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct B {
-        sides: Vec<Side>,
-        result: HashMap<Side, i32>,
-    }
-    let mut map = HashMap::new();
-    map.insert(Side::God, 10);
-    map.insert(Side::Right, -1);
-    map.insert(Side::Left, -1);
-    assert_eq!(
-        from_str::<B>("sides=God,Left,Right&result[God]=10&result[Right]=-1&result[Left]=-1"),
-        Ok(B {
-            sides: vec![Side::God, Side::Left, Side::Right],
-            result: map
-        })
-    );
-}
-
-#[test]
-fn deserialize_enum_in_map() {
+fn deserialize_enums() {
     // from rust by example book
     #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
     enum Event {
@@ -563,7 +556,7 @@ fn deserialize_enum_in_map() {
 }
 
 #[test]
-fn deserialize_sequence_key() {
+fn deserialize_sequence() {
     #[derive(Debug, Deserialize, PartialEq)]
     struct UvRate {
         nums: Vec<i32>,
@@ -639,7 +632,7 @@ fn deserialize_sequence_key() {
 }
 
 #[test]
-fn deserialize_sequence_key_ordered() {
+fn deserialize_sequence_ordered() {
     assert_eq!(
         from_str("value[10]=9&value[10]=10&value[1]=2&value[8]=8&value[2]=3&value[6]=7&value[0]=1&value[]=0"),
         Ok(p!(vec![0, 1, 2, 3, 7, 8, 10]))
@@ -661,6 +654,169 @@ fn deserialize_sequence_key_ordered() {
 }
 
 #[test]
+fn deserialize_string_key() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Family {
+        #[serde(rename = "بابا")]
+        dad: String,
+        #[serde(rename = "مامان")]
+        mom: String,
+        #[serde(rename = "مامان بزرگ")]
+        grandma: String,
+    }
+
+    assert_eq!(
+        from_str(
+            "%D8%A8%D8%A7%D8%A8%D8%A7=%D9%BE%D8%AF%D8%B1&\
+            %D9%85%D8%A7%D9%85%D8%A7%D9%86=%D9%85%D8%A7%D8%AF%D8%B1&\
+            %D9%85%D8%A7%D9%85%D8%A7%D9%86+%D8%A8%D8%B2%D8%B1%DA%AF=\
+            %D9%85%D8%A7%D8%AF%D8%B1+%D8%A8%D8%B2%D8%B1%DA%AF"
+        ),
+        Ok(Family {
+            dad: "پدر".to_string(),
+            mom: "مادر".to_string(),
+            grandma: "مادر بزرگ".to_string()
+        }),
+    );
+}
+
+#[test]
+fn deserialize_number_key() {
+    let mut map = HashMap::new();
+    map.insert(1, "Only");
+    map.insert(2, "Couple");
+    map.insert(3, "Some");
+
+    assert_eq!(from_str("1=Only&2=Couple&3=Some"), Ok(map));
+}
+
+#[test]
+fn deserialize_sequence_as_value_key() {
+    #[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
+    struct Point(i32, i32, i32);
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Sample {
+        weight: HashMap<Point, i32>,
+    };
+
+    let mut weight = HashMap::new();
+    weight.insert(Point(1, 1, 1), 1200);
+    weight.insert(Point(2, 2, 2), 2400);
+
+    let res = Ok(Sample { weight });
+
+    assert_eq!(from_str("weight[1,1,1]=1200&weight[2,2,2]=2400"), res);
+
+    // TODO: This should not work
+    assert_eq!(from_str("weight[1,1,1,1]=1200&weight[2,2,2,2]=2400"), res);
+
+    // The same with strings
+    #[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
+    struct PointString(String, String, String);
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct SampleString {
+        weight: HashMap<PointString, String>,
+    };
+
+    let mut weight = HashMap::new();
+    weight.insert(
+        PointString("1a".to_string(), "1a".to_string(), "1a".to_string()),
+        "big".to_string(),
+    );
+    weight.insert(
+        PointString("2a".to_string(), "2a".to_string(), "2a".to_string()),
+        "small".to_string(),
+    );
+
+    let res = Ok(SampleString { weight });
+
+    assert_eq!(from_str("weight[1a,1a,1a]=big&weight[2a,2a,2a]=small"), res);
+
+    // TODO: this should not work
+    assert_eq!(
+        from_str("weight[1a,1a,1a,1a]=big&weight[2a,2a,2a,2a]=small"),
+        res
+    );
+}
+
+// We don't support these kind of recursive structures
+#[test]
+fn deserialize_invalid_recursion() {
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
+    struct A {
+        a: BTreeMap<i32, A>,
+    };
+
+    assert!(from_str::<A>("a[2]=a[2]=").is_err());
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct A2(Vec<A2>);
+
+    assert!(from_str::<Primitive<A2>>("value=1,1,1").is_err())
+}
+
+#[test]
+fn deserialize_recursion_overflow() {
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
+    struct B {
+        a: Box<Option<B>>,
+    };
+
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
+    struct A {
+        a: B,
+    };
+
+    // An input of `a[a][a][a][a]=` is in this case, but as long as we stay below the recurstion limit
+    let mut s = "a".to_string();
+    for _ in 0..64 {
+        s.push_str("[a]");
+    }
+    s.push_str("=");
+
+    assert!(from_str::<A>(&s).is_ok());
+
+    let mut s = "a".to_string();
+    for _ in 0..65 {
+        s.push_str("[a]");
+    }
+    s.push_str("=");
+
+    assert!(from_str::<A>(&s).is_err());
+}
+
+#[test]
+fn deserialize_without_and() {
+    assert!(from_str::<HashMap<String, i32>>("key1=321key2=123key3=7").is_err());
+
+    let mut map = HashMap::new();
+    map.insert("key1".to_string(), "321key2=123key3=7".to_string());
+    assert_eq!(
+        from_str::<HashMap<String, String>>("key1=321key2=123key3=7"),
+        Ok(map)
+    );
+}
+
+#[test]
+fn deserialize_unit_value() {
+    assert_eq!(from_str(""), Ok(()));
+    assert_eq!(from_str("&"), Ok(()));
+
+    // We don't support sequences at root yet
+    // TODO: Fix this
+    // assert_eq!(from_str("&&"), Ok(((), ())));
+    // assert_eq!(from_str("&&&"), Ok(((), (), ())));
+    // assert_eq!(from_str("&value=200"), Ok(((), p!(200))));
+    // assert_eq!(from_str("&&value=-200"), Ok(((), (), p!(-200))));
+    // assert_eq!(
+    //     from_str("&&value=test"),
+    //     Ok(((), (), p!("test".to_string())))
+    // );
+}
+
+#[test]
 fn deserialize_invalid() {
     // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
 }
@@ -669,3 +825,9 @@ fn deserialize_invalid() {
 fn deserialize_to_unit() {
     // from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
 }
+
+// It should be here, but it is not to keep the same behaviour as serde_urlencoded
+// #[test]
+// fn deserialize_percentage_invalid() {
+//     assert!(from_str::<String>("%00%01%11").is_err());
+// }
