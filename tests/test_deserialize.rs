@@ -817,6 +817,132 @@ fn deserialize_unit_value() {
 }
 
 #[test]
+fn deserialize_bench_child() {
+    #[allow(dead_code)]
+    #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+    struct SampleChild {
+        x: i32,
+        y: i32,
+        z: i32,
+    }
+
+    #[allow(dead_code)]
+    #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+    struct Sample {
+        x: SampleChild,
+        y: SampleChild,
+        z: SampleChild,
+    }
+    let unordered = "z[z]=33333&z[y]=222222&z[x]=11111&\
+                     y[z]=33333&y[y]=222222&y[x]=11111&\
+                     x[z]=33333&x[y]=222222&x[x]=11111";
+    let ordered = "x[x]=11111&x[y]=222222&x[z]=33333&\
+                    y[x]=11111&y[y]=222222&y[z]=33333&\
+                    z[x]=11111&z[y]=222222&z[z]=33333";
+
+    let child = SampleChild {
+        x: 11111,
+        y: 222222,
+        z: 33333,
+    };
+
+    let res = Sample {
+        x: child,
+        y: child,
+        z: child,
+    };
+
+    // Check if everything is working as expected
+    assert_eq!(from_str(&ordered), Ok(res));
+    assert_eq!(from_str(&unordered), Ok(res));
+}
+
+#[test]
+fn deserialize_bench_decoded() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Sample {
+        amoo: String,
+        baba: String,
+    }
+    let ordered = "baba=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF&\
+                   amoo=%D8%B9%D9%85%D9%88%20%D9%86%D9%88%D8%B1%D9%88%D8%B2";
+    let unordered = "amoo=%D8%B9%D9%85%D9%88%20%D9%86%D9%88%D8%B1%D9%88%D8%B2&\
+                    baba=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF";
+
+    let res = Ok(Sample {
+        amoo: "عمو نوروز".to_string(),
+        baba: "بابابزرگ".to_string(),
+    });
+
+    assert_eq!(from_str::<Sample>(ordered), res);
+    assert_eq!(from_str::<Sample>(unordered), res);
+}
+
+#[test]
+fn deserialize_bench_multilevel() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Level4 {
+        x4: String,
+        y4: String,
+        z4: String,
+    }
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Level3 {
+        x3: Level4,
+        y3: Level4,
+        z3: Level4,
+    }
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Level2 {
+        x2: Level3,
+        y2: Level3,
+        z2: Level3,
+    }
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Level1 {
+        x1: Level2,
+        y1: Level2,
+        z1: Level2,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Sample {
+        x0: Level1,
+        y0: Level1,
+        z0: Level1,
+    }
+
+    let ordered = include_str!("multilevel_ordered.txt");
+    let unordered = include_str!("multilevel_unordered.txt");
+
+    // Just checking them to be equal and without errors
+    assert_eq!(
+        from_str::<Sample>(ordered).unwrap(),
+        from_str::<Sample>(unordered).unwrap()
+    );
+}
+
+#[test]
+fn deserialize_bench_seq() {
+    let mut ordered = String::new();
+    let mut res_ordered = Vec::new();
+    for i in 0..1000 {
+        ordered.push_str(&format!("value[{}]={}&", i, 1024 * i));
+        res_ordered.push(1024 * i);
+    }
+    ordered.remove(ordered.len() - 1);
+
+    let mut reverse = String::new();
+    for i in 1..=1000 {
+        reverse.push_str(&format!("value[{}]={}&", 1000 - i, 1024 * (1000 - i)));
+    }
+    reverse.remove(reverse.len() - 1);
+
+    assert_eq!(from_str(&ordered), Ok(p!(res_ordered.clone())));
+    assert_eq!(from_str(&reverse), Ok(p!(res_ordered)));
+}
+
+#[test]
 fn deserialize_invalid() {
     // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
 }
@@ -825,9 +951,3 @@ fn deserialize_invalid() {
 fn deserialize_to_unit() {
     // from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
 }
-
-// It should be here, but it is not to keep the same behaviour as serde_urlencoded
-// #[test]
-// fn deserialize_percentage_invalid() {
-//     assert!(from_str::<String>("%00%01%11").is_err());
-// }
