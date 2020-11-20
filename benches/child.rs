@@ -19,12 +19,8 @@ struct Sample {
     z: SampleChild,
 }
 
-fn serde_querystring(input: &str) -> Result<Sample, impl Error> {
+fn deserialize(input: &str) -> Result<Sample, impl Error> {
     serde_querystring::from_str::<Sample>(input)
-}
-
-fn serde_qs(input: &str) -> Result<Sample, impl Error> {
-    serde_qs::from_str::<Sample>(input)
 }
 
 fn ordered(c: &mut Criterion) {
@@ -32,18 +28,7 @@ fn ordered(c: &mut Criterion) {
                    y[x]=11111&y[y]=222222&y[z]=33333&\
                    z[x]=11111&z[y]=222222&z[z]=33333";
 
-    // Check if everything is working as expected
-    assert_eq!(
-        serde_querystring(ordered).unwrap(),
-        serde_qs(ordered).unwrap()
-    );
-
-    c.bench_function("one level child ordered querystring", |b| {
-        b.iter(|| serde_querystring(ordered))
-    });
-    c.bench_function("one level child ordered qs", |b| {
-        b.iter(|| serde_qs(ordered))
-    });
+    c.bench_function("one level ordered", |b| b.iter(|| deserialize(ordered)));
 }
 
 fn unordered(c: &mut Criterion) {
@@ -51,18 +36,7 @@ fn unordered(c: &mut Criterion) {
                      y[z]=11111&y[y]=222222&y[x]=33333&\
                      x[z]=11111&x[y]=222222&x[x]=33333";
 
-    // Check if everything is working as expected
-    assert_eq!(
-        serde_querystring(unordered).unwrap(),
-        serde_qs(unordered).unwrap()
-    );
-
-    c.bench_function("one level child unordered querystring", |b| {
-        b.iter(|| serde_querystring(unordered))
-    });
-    c.bench_function("one level child unordered qs", |b| {
-        b.iter(|| serde_qs(unordered))
-    });
+    c.bench_function("one level unordered", |b| b.iter(|| deserialize(unordered)));
 }
 
 criterion_group!(benches, ordered, unordered);
