@@ -774,7 +774,7 @@ fn deserialize_recursion_overflow() {
     for _ in 0..64 {
         s.push_str("[a]");
     }
-    s.push_str("=");
+    s.push('=');
 
     assert!(from_str::<A>(&s).is_ok());
 
@@ -782,7 +782,7 @@ fn deserialize_recursion_overflow() {
     for _ in 0..65 {
         s.push_str("[a]");
     }
-    s.push_str("=");
+    s.push('=');
 
     assert!(from_str::<A>(&s).is_err());
 }

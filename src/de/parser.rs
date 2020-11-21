@@ -544,7 +544,7 @@ impl<'de> Parser<'de> {
         }
 
         let slice = &self.slice[start_index..self.index];
-        return Ok(Some(slice));
+        Ok(Some(slice))
     }
 
     pub(crate) fn done(&self) -> bool {
