@@ -349,14 +349,15 @@ fn deserialize_map_of_maps() {
     let map = hashmap_it(map);
     let map = hashmap_it(map);
     let map = hashmap_it(map);
+    let ok_map = Ok(map);
 
-    let deserialized = from_str(
-        "key[key][key][key][key][key][key][key][key][key][key][key]\
-        [key][key][key][key][key][key][key][key][key]=value",
-    )
-    .unwrap();
-
-    assert_eq!(map, deserialized);
+    assert_eq!(
+        from_str(
+            "key[key][key][key][key][key][key][key][key][key][key][key]\
+             [key][key][key][key][key][key][key][key][key]=value",
+        ),
+        ok_map
+    );
 }
 
 #[test]
@@ -922,6 +923,17 @@ fn deserialize_bench_multilevel() {
     );
 }
 
+#[derive(Deserialize, PartialEq)]
+struct SeqStruct {
+    value: Vec<i32>,
+}
+
+impl std::fmt::Debug for SeqStruct {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Long sequence of values").finish()
+    }
+}
+
 #[test]
 fn deserialize_bench_seq() {
     let mut ordered = String::new();
@@ -938,8 +950,13 @@ fn deserialize_bench_seq() {
     }
     reverse.remove(reverse.len() - 1);
 
-    assert_eq!(from_str(&ordered), Ok(p!(res_ordered.clone())));
-    assert_eq!(from_str(&reverse), Ok(p!(res_ordered)));
+    assert_eq!(
+        from_str(&ordered),
+        Ok(SeqStruct {
+            value: res_ordered.clone()
+        })
+    );
+    assert_eq!(from_str(&reverse), Ok(SeqStruct { value: res_ordered }));
 }
 
 #[test]
