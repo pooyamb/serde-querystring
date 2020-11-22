@@ -10,11 +10,11 @@ fn deserialize<T: serde::de::DeserializeOwned>() -> Result<Value<T>, impl Error>
 }
 
 fn deserialize_to_string(c: &mut Criterion) {
-    c.bench_function("simple string", |b| b.iter(|| deserialize::<String>()));
+    c.bench_function("simple string", |b| b.iter(deserialize::<String>));
 }
 
 fn deserialize_to_number(c: &mut Criterion) {
-    c.bench_function("simple number", |b| b.iter(|| deserialize::<isize>()));
+    c.bench_function("simple number", |b| b.iter(deserialize::<isize>));
 }
 
 criterion_group!(benches, deserialize_to_string, deserialize_to_number);
