@@ -28,7 +28,7 @@
 //! So the terms `group name` and `key` are interchangeable here.
 //!
 //! ## Value
-//! Values are the leaves of our tree, meaning by looking at them we can instantly say what they are and
+//! Values are the leaves of tree, meaning by looking at them we can instantly say what they are and
 //! we don't need to go any deeper to undestand their meaning, in other words, they can't have any sub value or
 //! sub keys(with one exception).
 //!
@@ -51,7 +51,7 @@
 //! A query string starts either by a `map` or a `struct` at its root, these two are represented in the same
 //! way and are considered the same kind of entity except when dealing with repeated keys(Described later).
 //! To represent them, we start from the root's fields and consider every one of them a key, if the value
-//! associated with that group/key also needs a sub group itself, we consider that group name as a subkey of our main key.
+//! associated with that group/key also needs a sub group itself, we consider that group name as a subkey of main key.
 //!
 //! ### Example
 //!
@@ -166,6 +166,22 @@
 //! In this kind of situations, to keep consistency with other kinds of keys, we only consider the
 //! `last defined group`, so in the above example although the last key belongs to `Click` group name, we only
 //! consider `Missed` group as it is defined after `Click`.
+//!
+//! #### Exception
+//!
+//! One exception is when there are enums in a map or sequence, and one of the enums are defined as a
+//! value. In that case we visit the values first and we ignore the subkeys. So the following query strings
+//! are all considered `PageLoad`.
+//!
+//! `last=PageLoad&last[KeyPress]=C`
+//!
+//! `last[KeyPress]=C&last=PageLoad`
+//!
+//! `last=PageUnload&last[KeyPress]=C&last=PageLoad`
+//!
+//! To overcome this, you can define all enum variants at the sublevel, ex:
+//!
+//! `last[PageLoad]=&last[KeyPress]=C`
 //!
 
 mod de;

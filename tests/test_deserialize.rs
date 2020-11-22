@@ -646,10 +646,18 @@ fn deserialize_sequence_ordered() {
         R { x: i32, y: i32 },
     }
 
-    // Keyed sequences are first come first serve
+    // Keyed sequences are last defined group
     assert_eq!(
         from_str("value[1][E][]=1&value[1][R][y]=2&value[1][E][]=2&value[1][R][x]=1"),
         Ok(p!(vec![Anum::R { x: 1, y: 2 }]))
+    );
+
+    // Exceptional enum in sequence
+    assert_eq!(from_str("value[1]=Q&value[1][W]=10"), Ok(p!(vec![Anum::Q])));
+    assert_eq!(from_str("value[1][W]=10&value[1]=Q"), Ok(p!(vec![Anum::Q])));
+    assert_eq!(
+        from_str("value[1][Q]=&value[1][W]=10"),
+        Ok(p!(vec![Anum::W(10)]))
     );
 }
 
