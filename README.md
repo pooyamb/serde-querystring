@@ -22,7 +22,7 @@ An alternative query string parser based on serde for rust.
 ```toml
 # Cargo.toml
 [dependencies]
-serde-querystring = "0.0.5"
+serde-querystring = "0.0.6"
 ```
 
 ## Usage
@@ -55,7 +55,7 @@ If you're looking for a more production ready alternative, consider looking at t
 - Doesn't have correct error reporting yet
 - Doesn't support unit types
 - Doesn't check if it visited all the input when visiting subkeys
-- Doesn't support sequence of key-values at root(More of a feature)
+- Doesn't support deserializing into a sequence of key-values instead of map(More of a feature)
 
 Tests only cover valid querystrings in some cases, so there can be some bugs here and there. If you face a bug, please open an issue and let me know.
 
