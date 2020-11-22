@@ -73,40 +73,19 @@ impl<'de> PairMap<'de> {
         self.pairs = pairs;
     }
 
-    pub(crate) fn parse_pair(&mut self, pair: Pair<'de>) -> Result<Option<(&'de [u8], &'de [u8])>> {
+    pub(crate) fn parse_pair(
+        &mut self,
+        mut pair: Pair<'de>,
+    ) -> Result<Option<(&'de [u8], &'de [u8])>> {
         // Parse key
-        let mut key_index = 0;
-        let mut key_found = false;
-        while key_index < pair.key.len() {
-            match pair.key[key_index] {
-                b']' => {
-                    key_found = true;
-                    break;
-                }
-                _ => {
-                    key_index += 1;
-                }
-            }
-        }
+        let key = pair.key.next_key()?;
 
-        if !key_found {
-            return Err(Error::InvalidMapKey);
-        }
-
-        if pair.key.len() > key_index + 1 {
-            if pair.key.len() > key_index + 2 && pair.key[key_index + 1] == b'[' {
-                self.stash.add(
-                    &pair.key[0..key_index],
-                    &pair.key[(key_index + 2)..],
-                    pair.value,
-                );
+        match pair.key.next_subkey()? {
+            Some(subkey) => {
+                self.stash.add_subkey(&key, subkey, pair.value);
                 Ok(None)
-            } else {
-                // Cases like a[b]c=2 are invalid
-                Err(Error::InvalidMapKey)
             }
-        } else {
-            Ok(Some((&pair.key[0..key_index], pair.value)))
+            None => Ok(Some((&key, pair.value))),
         }
     }
 

@@ -358,6 +358,14 @@ fn deserialize_map_of_maps() {
         ),
         ok_map
     );
+
+    assert_eq!(
+        from_str(
+            "key%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D\
+             %5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D%5Bkey%5D=value",
+        ),
+        ok_map
+    );
 }
 
 #[test]
@@ -960,11 +968,26 @@ fn deserialize_bench_seq() {
 }
 
 #[test]
-fn deserialize_invalid() {
-    // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
+fn deserialize_percent_decoded_brackets() {
+    // We accept percent-decoded brackets either if they used as both the opening and closing brackets
+    // Or if they used with normal brackets together in any combination
+    // It may or may not make sense to accept a combination, please open an issue if you know of
+    // a situation that this may matter
+    assert_eq!(
+        from_str("value%5B%5D=22&value%5B1%5D=23&value[2%5D=24&value%5B3]=25&value[4]=26"),
+        Ok(p!(vec![22, 23, 24, 25, 26]))
+    );
+
+    assert_eq!(
+        from_str(
+            "value%5Bvalue%5D%5B%5D=22&value%5Bvalue%5D%5B1%5D=23&\
+            value[value][2%5D=24&value%5Bvalue]%5B3]=25&value[value][4]=26"
+        ),
+        Ok(p!(p!(vec![22, 23, 24, 25, 26])))
+    );
 }
 
 #[test]
-fn deserialize_to_unit() {
-    // from_str::<HashMap<String, ()>>("x[3]=22&x[2]=22") also for struct fields
+fn deserialize_invalid() {
+    // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
 }

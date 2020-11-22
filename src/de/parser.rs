@@ -11,14 +11,10 @@ macro_rules! overflow {
 }
 
 #[inline]
-pub(crate) fn parse_char(bytes: &[u8]) -> Result<u8> {
-    let high = char::from(bytes[0])
-        .to_digit(16)
-        .ok_or(Error::InvalidCharacter)?;
-    let low = char::from(bytes[1])
-        .to_digit(16)
-        .ok_or(Error::InvalidCharacter)?;
-    Ok(high as u8 * 0x10 + low as u8)
+pub(crate) fn parse_char(bytes: &[u8]) -> Option<u8> {
+    let high = char::from(bytes[0]).to_digit(16)?;
+    let low = char::from(bytes[1]).to_digit(16)?;
+    Some(high as u8 * 0x10 + low as u8)
 }
 
 pub struct Parser<'de> {
@@ -83,17 +79,22 @@ impl<'de> Parser<'de> {
                 }
                 b'%' => {
                     // we saw percentage
-                    scratch.extend_from_slice(&self.slice[start..self.index]);
-                    self.discard();
-
-                    if self.slice.len() < self.index + 1 {
-                        return Err(Error::EofReached);
+                    if self.slice.len() > self.index + 2 {
+                        match parse_char(&self.slice[(self.index + 1)..=(self.index + 2)]) {
+                            Some(b) => {
+                                scratch.extend_from_slice(&self.slice[start..self.index]);
+                                scratch.push(b);
+                                self.index += 3;
+                                start = self.index;
+                            }
+                            None => {
+                                // If it wasn't valid, just add the bytes as they were
+                                self.index += 3;
+                            }
+                        }
+                    } else {
+                        self.index += 1;
                     }
-
-                    scratch.push(parse_char(&self.slice[(self.index)..=(self.index + 1)])?);
-
-                    self.index += 2;
-                    start = self.index;
                 }
                 _ => {
                     self.index += 1;
@@ -469,12 +470,13 @@ impl<'de> Parser<'de> {
         }
     }
 
-    fn parse_subpair(&mut self, start_index: usize, stash: &mut super::Stash<'de>) -> Result<()> {
-        if start_index + 1 > self.slice.len() {
-            return Err(Error::EofReached);
+    fn parse_subpair(&mut self, key: &'de [u8], stash: &mut super::Stash<'de>) -> Result<()> {
+        if key.is_empty() {
+            // empty keys are not allowed at root level
+            return Err(Error::InvalidMapKey);
         }
 
-        let mut key_index = start_index + 1;
+        let mut key_index = self.index;
         while key_index < self.slice.len() {
             match self.slice[key_index] {
                 b'=' => {
@@ -487,11 +489,7 @@ impl<'de> Parser<'de> {
         }
 
         if key_index == self.slice.len() {
-            // Empty keys are not supported at root level
-            return Err(Error::InvalidMapKey);
-        }
-
-        if key_index == start_index + 1 {
+            // We didn't see equal sign
             return Err(Error::InvalidMapKey);
         }
 
@@ -508,8 +506,8 @@ impl<'de> Parser<'de> {
         }
 
         stash.add(
-            &self.slice[self.index..start_index],
-            &self.slice[(start_index + 1)..key_index],
+            &key,
+            &self.slice[self.index..key_index],
             &self.slice[(key_index + 1)..value_index],
         );
 
@@ -529,8 +527,29 @@ impl<'de> Parser<'de> {
                 }
                 b'[' => {
                     // It's a subkey
-                    self.parse_subpair(key_index, stash)?;
+                    let key = &self.slice[self.index..key_index];
+                    self.index = key_index + 1;
+                    self.parse_subpair(&key, stash)?;
                     key_index = self.index;
+                }
+                b'%' => {
+                    if self.slice.len() > key_index + 2 {
+                        match parse_char(&self.slice[(key_index + 1)..=(key_index + 2)]) {
+                            Some(b'[') => {
+                                // let key = &self.slice[self.index..(key_index - 1)];
+                                let key = &self.slice[self.index..key_index];
+                                self.index = key_index + 3;
+                                self.parse_subpair(&key, stash)?;
+                                key_index = self.index;
+                            }
+                            _ => {
+                                // If it wasn't valid, just add the bytes as they were
+                                key_index += 2;
+                            }
+                        }
+                    } else {
+                        key_index += 1;
+                    }
                 }
                 _ => {
                     key_index += 1;
@@ -542,6 +561,12 @@ impl<'de> Parser<'de> {
             return Ok(None);
         }
         let key = &self.slice[self.index..key_index];
+
+        if key.is_empty() {
+            // Empty keys are not allowed at root level
+            return Err(Error::InvalidMapKey);
+        }
+
         self.index = key_index + 1;
 
         Ok(Some(key))
