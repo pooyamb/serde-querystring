@@ -988,6 +988,82 @@ fn deserialize_percent_decoded_brackets() {
 }
 
 #[test]
-fn deserialize_invalid() {
-    // from_str::<HashMap<String, Vec<i32>>>("x[3]=22&&x[2]")
+fn deserialize_invalid_percent_decoded() {
+    // We just ignore invalid %__ and we move on without decoding them, % with one trailing
+    // character is also accepted but we just don't parse it. For this reason %%5D is also
+    // accepted and will be decoded as `%[`. If you think it makes to do something else,
+    // maybe giving back an error, or checking if % comes with 2 trailing characters,
+    // please open an issue.
+    assert_eq!(
+        from_str("value[1%25]=21&value[2%%%]=22&value[3%PO]=23"),
+        Ok(p!(vec![21, 22, 23]))
+    );
+
+    let mut map = HashMap::new();
+    map.insert("%PO", 1);
+    map.insert("%%", 2);
+    map.insert("%%%", 3);
+    map.insert("%query", 4);
+
+    assert_eq!(from_str("%PO=1&%%=2&%%%=3&%query=4"), Ok(map.clone()));
+
+    assert_eq!(
+        from_str("value[%PO]=1&value[%%]=2&value[%%%]=3&value[%query]=4"),
+        Ok(p!(map.clone()))
+    );
+
+    assert_eq!(
+        from_str(
+            "value[value][%PO]=1&value[value][%%]=2&value[value][%%%]=3&value[value][%query]=4"
+        ),
+        Ok(p!(p!(map)))
+    );
+}
+
+#[test]
+fn deserialize_invalid_map_keys() {
+    assert!(from_str::<Primitive<HashMap<String, i32>>>("value[[]]=2").is_err());
+    assert!(from_str::<Primitive<Primitive<HashMap<String, i32>>>>("value[value]value=2").is_err());
+    assert!(from_str::<Primitive<HashMap<String, i32>>>("value[a=2").is_err());
+
+    // Key is [a
+    assert!(from_str::<Primitive<HashMap<String, i32>>>("value[[a]=2").is_ok());
+
+    // Key is value]
+    assert!(from_str::<HashMap<String, HashMap<String, i32>>>("value][a]=2").is_ok());
+
+    // The same is not valid for subkeys, not yet at least
+    assert!(from_str::<Primitive<HashMap<String, i32>>>("value[value]]=2").is_err());
+}
+
+#[test]
+fn deserialize_invalid_sequence() {
+    // We can either visit empty values in sequence as Option::None or unit
+    assert_eq!(
+        from_str("value=,1,,2,,,3,"),
+        Ok(p!(vec![
+            None,
+            Some(1),
+            None,
+            Some(2),
+            None,
+            None,
+            Some(3),
+            None
+        ]))
+    );
+    assert_eq!(
+        from_str("value=,1,2,,,3,"),
+        Ok(p!(((), 1, 2, (), (), 3, ())))
+    );
+
+    let mut map = HashMap::new();
+    map.insert("value", ((), 1, 2, (), (), 3, ()));
+    map.insert("value2", ((), 1, 2, (), (), 3, ()));
+    assert_eq!(from_str("value=,1,2,,,3,&value2=,1,2,,,3,"), Ok(map));
+
+    // But we can't ignore them
+    assert!(from_str::<Primitive<Vec<i32>>>("value=1,2,3,").is_err());
+    assert!(from_str::<Primitive<Vec<i32>>>("value=,1,2,3").is_err());
+    assert!(from_str::<Primitive<Vec<i32>>>("value=1,2,,3").is_err());
 }
