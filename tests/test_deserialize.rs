@@ -811,17 +811,9 @@ fn deserialize_without_and() {
 fn deserialize_unit_value() {
     assert_eq!(from_str(""), Ok(()));
     assert_eq!(from_str("&"), Ok(()));
-
-    // We don't support sequences at root yet
-    // TODO: Fix this
-    // assert_eq!(from_str("&&"), Ok(((), ())));
-    // assert_eq!(from_str("&&&"), Ok(((), (), ())));
-    // assert_eq!(from_str("&value=200"), Ok(((), p!(200))));
-    // assert_eq!(from_str("&&value=-200"), Ok(((), (), p!(-200))));
-    // assert_eq!(
-    //     from_str("&&value=test"),
-    //     Ok(((), (), p!("test".to_string())))
-    // );
+    assert_eq!(from_str("&&"), Ok(()));
+    assert_eq!(from_str("&&&;;;"), Ok(()));
+    assert!(from_str::<()>("&&&;;;a=b").is_err());
 }
 
 #[test]

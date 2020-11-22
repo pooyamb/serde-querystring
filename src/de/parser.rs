@@ -523,7 +523,7 @@ impl<'de> Parser<'de> {
         let mut key_index = self.index;
         while key_index < self.slice.len() {
             match self.slice[key_index] {
-                b'=' => {
+                b'=' | b'&' | b';' => {
                     key_found = true;
                     break;
                 }

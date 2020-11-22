@@ -66,17 +66,43 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        if self.parser.peek()? == Some(b'&') {
-            self.parser.discard();
+        while let Some(b) = self.parser.next()? {
+            match b {
+                b'&' | b';' => {}
+                _ => return Err(Error::InvalidCharacter),
+            }
         }
 
         visitor.visit_unit()
     }
 
+    fn deserialize_unit_struct<V>(self, _: &'static str, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        while self.parser.next()?.is_some() {}
+        visitor.visit_unit()
+    }
+
+    #[inline]
+    fn deserialize_newtype_struct<V>(self, _: &str, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
+
     forward_to_deserialize_any! {
         <W: Visitor<'de>>
-        char str string bytes byte_buf unit_struct tuple_struct option enum
-        identifier ignored_any tuple seq newtype_struct bool
+        char str string bytes byte_buf tuple_struct option enum
+        identifier tuple seq bool
         i8 i16 i32 i64 u8 u16 u32 u64 f32 f64
     }
 }

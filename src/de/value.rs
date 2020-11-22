@@ -169,6 +169,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
         }
     }
 
+    #[inline]
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -178,6 +179,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     }
 
     /// We don't check the bytes to be valid utf8
+    #[inline]
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -196,6 +198,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
         }
     }
 
+    #[inline]
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
