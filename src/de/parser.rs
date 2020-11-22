@@ -88,8 +88,8 @@ impl<'de> Parser<'de> {
                                 start = self.index;
                             }
                             None => {
-                                // If it wasn't valid, just add the bytes as they were
-                                self.index += 3;
+                                // If it wasn't valid, go to the next byte
+                                self.index += 1;
                             }
                         }
                     } else {
@@ -543,8 +543,8 @@ impl<'de> Parser<'de> {
                                 key_index = self.index;
                             }
                             _ => {
-                                // If it wasn't valid, just add the bytes as they were
-                                key_index += 2;
+                                // If it wasn't opening bracket, go to the next byte
+                                key_index += 1;
                             }
                         }
                     } else {

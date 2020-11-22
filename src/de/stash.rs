@@ -33,7 +33,7 @@ impl<'de> SubKey<'de> {
                                 return Ok(&key);
                             }
                             _ => {
-                                self.index += 3;
+                                self.index += 1;
                             }
                         }
                     } else {
