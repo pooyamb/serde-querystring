@@ -34,6 +34,8 @@ let x: MyStruct = serde_querystring::from_str("YOUR QUERY STRING");
 
 To see what is supported and what is not, please [read the docs](https://docs.rs/serde-querystring).
 
+There is also `serde-querystring-actix` crate to support using this crate with actix-web. It provides `QueryString` extractor which works just like the actix-web's own web::Query but uses `serde-querystring` to deserialize.
+
 ## Why
 
 Existing alternatives don't cover some cases, for example enums (having enums in sequences, usefull for filters in rest apis) is not a first class value in similar crates. This crate tries to cover more real world use cases and it uses a different strategy to parse the query string which gives it some freedom to decide how to parse depending on the resulting data structure. Note that it may not be fully compatible with some existing standards in some cases, but it tries to support the cases they defined.

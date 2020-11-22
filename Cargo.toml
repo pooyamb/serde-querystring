@@ -1,3 +1,9 @@
+[workspace]
+members = [".", "serde-querystring-actix"]
+
+[patch.crates-io]
+serde-querystring = { path = "." }
+
 [package]
 name = "serde-querystring"
 version = "0.0.7"
