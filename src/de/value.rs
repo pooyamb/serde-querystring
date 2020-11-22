@@ -87,8 +87,8 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
         let value = match peek {
             b'=' => Err(Error::InvalidMapKey),
             _ => match self.parser.parse_str(&mut self.scratch)? {
-                Reference::Borrowed(s) => visitor.visit_borrowed_str(s),
-                Reference::Copied(s) => visitor.visit_str(s),
+                Reference::Borrowed(b) => visitor.visit_borrowed_str(b),
+                Reference::Copied(c) => visitor.visit_str(c),
             },
         };
         value
@@ -169,18 +169,44 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
         }
     }
 
-    #[inline]
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
+        self.parser.parse_ignore()?;
         visitor.visit_unit()
+    }
+
+    /// We don't check the bytes to be valid utf8
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        let peek = match self.parser.peek()? {
+            Some(b) => b,
+            None => return visitor.visit_unit(),
+        };
+
+        match peek {
+            b'=' => Err(Error::InvalidMapKey),
+            _ => match self.parser.parse_bytes(&mut self.scratch)? {
+                Reference::Borrowed(b) => visitor.visit_borrowed_bytes(b),
+                Reference::Copied(c) => visitor.visit_bytes(c),
+            },
+        }
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_bytes(visitor)
     }
 
     forward_to_deserialize_any! {
         <W: Visitor<'de>>
-        char str string bytes byte_buf unit_struct map struct
-        identifier ignored_any
+        char str string unit unit_struct map struct
+        identifier
     }
 
     deserialize_number!(deserialize_i8);

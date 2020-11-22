@@ -121,6 +121,13 @@ impl<'de> Parser<'de> {
         })
     }
 
+    pub(crate) fn parse_bytes<'s>(
+        &'s mut self,
+        scratch: &'s mut Vec<u8>,
+    ) -> Result<Reference<'de, 's, [u8]>> {
+        self.parse_str_bytes(scratch, |_, bytes| Ok(bytes))
+    }
+
     #[cold]
     #[inline(never)]
     fn parse_decimal_overflow(
@@ -388,6 +395,19 @@ impl<'de> Parser<'de> {
                 }
             }
         })
+    }
+
+    pub(crate) fn parse_ignore(&mut self) -> Result<()> {
+        while let Some(b) = self.next()? {
+            match b {
+                b'&' | b';' => {
+                    self.discard();
+                    break;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn parse_ident(&mut self, ident: &[u8]) -> Result<()> {
