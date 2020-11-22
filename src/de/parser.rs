@@ -572,9 +572,11 @@ impl<'de> Parser<'de> {
         Ok(Some(key))
     }
 
+    /// Visit one value in a sequence knowing the previous byte was either `=` or `,`
+    /// without eating the next delimiter
     pub(crate) fn parse_one_seq_value(&mut self) -> Result<Option<&'de [u8]>> {
         if self.done() {
-            return Ok(None);
+            return Ok(Some(b""));
         }
 
         let start_index = self.index;
