@@ -42,6 +42,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         Err(Error::NotSupportedAsValue)
     }
 
+    #[inline]
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -49,6 +50,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_map(self)
     }
 
+    #[inline]
     fn deserialize_struct<V>(
         self,
         _: &'static str,
@@ -76,6 +78,7 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_unit()
     }
 
+    #[inline]
     fn deserialize_unit_struct<V>(self, _: &'static str, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -83,12 +86,16 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.deserialize_unit(visitor)
     }
 
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    #[inline]
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        while self.parser.next()?.is_some() {}
-        visitor.visit_unit()
+        if self.is_finished() {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self)
+        }
     }
 
     #[inline]
@@ -99,11 +106,20 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_newtype_struct(self)
     }
 
+    #[inline]
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        while self.parser.next()?.is_some() {}
+        visitor.visit_unit()
+    }
+
     forward_to_deserialize_any! {
         <W: Visitor<'de>>
-        char str string bytes byte_buf tuple_struct option enum
+        i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64
+        char str string bytes byte_buf tuple_struct enum
         identifier tuple seq bool
-        i8 i16 i32 i64 u8 u16 u32 u64 f32 f64
     }
 }
 

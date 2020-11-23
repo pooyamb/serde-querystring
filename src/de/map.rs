@@ -222,10 +222,77 @@ impl<'de> de::Deserializer<'de> for PairMap<'de> {
         visitor.visit_seq(&mut self.into_seq()?)
     }
 
+    fn deserialize_tuple<V>(self, _: usize, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    #[inline]
+    fn deserialize_tuple_struct<V>(self, _: &'static str, _: usize, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    #[inline]
+    fn deserialize_newtype_struct<V>(self, _: &'static str, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        if self.pairs.is_empty() {
+            visitor.visit_unit()
+        } else {
+            visitor.visit_map(self)
+        }
+    }
+
+    fn deserialize_unit_struct<V>(self, _: &'static str, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        _: &'static str,
+        _: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
+
     forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf unit unit_struct newtype_struct tuple
-        tuple_struct map struct identifier ignored_any
+        <W: Visitor<'de>>
+        i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64
+        bool char str string bytes byte_buf identifier
     }
 }
 
