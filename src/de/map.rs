@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 
-use serde::{de, forward_to_deserialize_any};
+use serde::de;
 
 use super::seq::{ItemKind, PairSeq};
 use super::stash::{Pair, Stash};
@@ -176,6 +176,31 @@ impl<'de> PairMap<'de> {
 
         Ok(PairSeq::new(items))
     }
+
+    fn deserialize_invalid<V>(&self, _: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        // We don't support raw values in the map deserializer itself, which will be triggered
+        // if query string defines a map and we expect a value
+        // The reason for not using the deserialize_any in this case is the bug in serde when using
+        // flatten
+        Err(Error::ExpectedValue)
+    }
+}
+
+macro_rules! forward_to_deserialize_invalid {
+    ($($func:ident)*) => {
+        $(
+            #[inline]
+            fn $func<V>(self, visitor: V) -> Result<V::Value>
+            where
+                V: de::Visitor<'de>,
+            {
+                self.deserialize_invalid(visitor)
+            }
+        )*
+    };
 }
 
 impl<'de> de::Deserializer<'de> for PairMap<'de> {
@@ -186,6 +211,12 @@ impl<'de> de::Deserializer<'de> for PairMap<'de> {
     where
         V: de::Visitor<'de>,
     {
+        // As we already captured all serde supported types in other methods,
+        // we only hit this if it is manually triggered either by a type's own
+        // deserialize implementation or serde's flatten and tagged enums.
+        // We may be able to guess what the underlying type is (enum, map or seq)
+        // by looking at the keys, but it results in incontinence behaviour.
+        // May be solve in future
         visitor.visit_map(self)
     }
 
@@ -289,10 +320,12 @@ impl<'de> de::Deserializer<'de> for PairMap<'de> {
         visitor.visit_map(self)
     }
 
-    forward_to_deserialize_any! {
-        <W: Visitor<'de>>
-        i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64
-        bool char str string bytes byte_buf identifier
+    forward_to_deserialize_invalid! {
+        deserialize_i8 deserialize_i16 deserialize_i32 deserialize_i64 deserialize_i128
+        deserialize_u8 deserialize_u16 deserialize_u32 deserialize_u64 deserialize_u128
+        deserialize_f32 deserialize_f64 deserialize_bool deserialize_char
+        deserialize_str  deserialize_string  deserialize_bytes  deserialize_byte_buf
+        deserialize_identifier
     }
 }
 
