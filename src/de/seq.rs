@@ -34,4 +34,8 @@ impl<'de> de::SeqAccess<'de> for PairSeq<'de> {
             None => Ok(None),
         }
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.items.len())
+    }
 }
