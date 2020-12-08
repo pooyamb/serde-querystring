@@ -371,6 +371,10 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
             }
         }
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.pairs.len())
+    }
 }
 
 impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
