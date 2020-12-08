@@ -118,7 +118,7 @@ impl<'de> PairMap<'de> {
             if let Some((key, value)) = self.parse_pair(pair)? {
                 // If it is in current level just add it as a single value
                 values.push((key, ItemKind::Value(value)));
-            } else if let Some(key) = self.stash.next_key()? {
+            } else if let Some(key) = self.stash.next_key() {
                 // Visit the stash
                 if key.is_empty() {
                     // If key is empty, then add it as a single map
@@ -215,7 +215,7 @@ impl<'de> de::Deserializer<'de> for PairMap<'de> {
         // we only hit this if it is manually triggered either by a type's own
         // deserialize implementation or serde's flatten and tagged enums.
         // We may be able to guess what the underlying type is (enum, map or seq)
-        // by looking at the keys, but it results in incontinence behaviour.
+        // by looking at the keys, but it results in inconsistent behaviour.
         // May be solve in future
         visitor.visit_map(self)
     }
@@ -348,9 +348,7 @@ impl<'de> de::MapAccess<'de> for PairMap<'de> {
         }
 
         // Visit stash
-        let key = self.stash.next_key()?;
-
-        match key {
+        match self.stash.next_key() {
             Some(key) => seed
                 .deserialize(&mut Value::new(&mut Parser::new(key)))
                 .map(Some),
@@ -398,7 +396,7 @@ impl<'de> de::EnumAccess<'de> for &mut PairMap<'de> {
             Some(key) => key,
             None => {
                 // Visit stash
-                while let Some(key) = self.stash.next_key()? {
+                while let Some(key) = self.stash.next_key() {
                     last_key = Some(key)
                 }
 

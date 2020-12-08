@@ -114,12 +114,12 @@ impl<'de> Stash<'de> {
         }
     }
 
-    pub(crate) fn next_key(&mut self) -> Result<Option<&'de [u8]>> {
+    pub(crate) fn next_key(&mut self) -> Option<&'de [u8]> {
         if let Some((key, pairs)) = self.pairs.pop_back() {
             self.values = Some(pairs);
-            Ok(Some(key))
+            Some(key)
         } else {
-            Ok(None)
+            None
         }
     }
 

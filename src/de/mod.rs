@@ -140,8 +140,7 @@ impl<'de> de::MapAccess<'de> for Deserializer<'de> {
         }
 
         // Visit stash
-        let key = self.stash.next_key()?;
-        match key {
+        match self.stash.next_key() {
             Some(key) => seed
                 .deserialize(&mut Value::new(&mut Parser::new(key)))
                 .map(Some),
