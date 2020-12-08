@@ -1,6 +1,6 @@
 [package]
 name = "serde-querystring-actix"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Pouya M. B. <pooyamb@gmail.com>"]
 description = "A query string extractor for actix-web based on serde-querystring"
 edition = "2018"
@@ -17,7 +17,7 @@ actix-web = "3"
 serde = "1"
 derive_more = "0.99"
 log = "0.4"
-serde-querystring = "0.0.8"
+serde-querystring = "0.0.9"
 
 [dev-dependencies]
 actix-rt = "1"
