@@ -1,97 +1,239 @@
-use serde::de::IntoDeserializer;
-use serde::{de, forward_to_deserialize_any};
+use std::str::{self, Utf8Error};
 
-use super::parser::{Parser, Reference};
-use super::{Error, Result};
+use lexical::FromLexical;
+use serde::{
+    de::{self, IntoDeserializer},
+    forward_to_deserialize_any,
+};
 
-pub(crate) struct Value<'de, 'a> {
-    parser: &'a mut Parser<'de>,
-    scratch: Vec<u8>,
-    // Only used for vectors, as we don't support vectors of vectors
-    flat: bool,
+use crate::error::{Error, ErrorKind, Result};
+
+#[inline]
+pub(crate) fn parse_char(bytes: &[u8]) -> Option<u8> {
+    let high = char::from(bytes[0]).to_digit(16)?;
+    let low = char::from(bytes[1]).to_digit(16)?;
+    Some(high as u8 * 0x10 + low as u8)
 }
 
-impl<'de, 'a> Value<'de, 'a> {
-    pub(crate) fn new(parser: &'a mut Parser<'de>) -> Self {
+pub(crate) struct ValueDeserializer<'de, 'a> {
+    slice: &'de [u8],
+    scratch: &'a mut Vec<u8>,
+    index: usize,
+}
+
+impl<'de, 'a> ValueDeserializer<'de, 'a> {
+    pub(crate) fn new(slice: &'de [u8], scratch: &'a mut Vec<u8>) -> Self {
         Self {
-            parser,
-            scratch: Vec::new(),
-            flat: false,
+            slice,
+            scratch,
+            index: 0,
         }
     }
 
-    pub(crate) fn new_flat(parser: &'a mut Parser<'de>) -> Self {
-        Self {
-            parser,
-            scratch: Vec::new(),
-            flat: true,
-        }
-    }
-
-    fn deserialize_number<V>(&mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_signed<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        let peek = match self.parser.peek()? {
-            Some(b) => b,
-            None => {
-                return Err(Error::EofReached);
-            }
-        };
+        visitor.visit_i64(self.parse_number()?)
+    }
 
-        let res = match peek {
-            b'-' => {
-                self.parser.discard();
-                self.parser.parse_integer(false)?.visit(visitor)
-            }
-            b'0'..=b'9' => self.parser.parse_integer(true)?.visit(visitor),
-            _ => {
-                return Err(Error::InvalidNumber);
-            }
-        };
+    fn deserialize_unsigned<V>(mut self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_u64(self.parse_number()?)
+    }
 
-        match self.parser.peek()? {
-            None | Some(b'&') | Some(b';') => {
-                self.parser.discard();
-                res
+    fn deserialize_float<V>(mut self, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_f64(self.parse_number()?)
+    }
+
+    #[cold]
+    fn invalid_encoding(&self, error: Utf8Error) -> Error {
+        Error::new(ErrorKind::InvalidEncoding)
+            .message("invalid utf-8 sequence found in the percent decoded value".to_string())
+            .value(self.slice)
+            .index(self.index_before_decoding(error.valid_up_to()))
+    }
+
+    #[cold]
+    fn invalid_number(&self, error: lexical::Error) -> Error {
+        // Lexical doesn't provide a method to see if it's a parsing error
+        // It may be better to just use enum matching for the error, but it's harder
+        let err_string = error.to_string();
+        if err_string.starts_with("lexical parse error") {
+            // The actual message is between the first two single quotations
+            let the_message = err_string.split('\'');
+
+            if let Some(the_message) = the_message.skip(1).next() {
+                if let Some(index) = error.index() {
+                    return Error::new(ErrorKind::InvalidNumber)
+                        .message(the_message.to_owned())
+                        .value(self.slice)
+                        .index(self.index_before_decoding(*index));
+                }
             }
-            Some(_) => Err(Error::InvalidNumber),
+        }
+
+        // We shouldn't reach here unless lexical change their error message
+        // Or some configs change, etc
+        Error::new(ErrorKind::InvalidEncoding)
+            .message(err_string)
+            .value(self.slice)
+    }
+
+    #[cold]
+    fn invalid_boolean(&self) -> Error {
+        Error::new(ErrorKind::InvalidBoolean)
+            .message(String::from("invalid ident found for boolean"))
+            .value(self.slice)
+            .index(0)
+    }
+
+    #[cold]
+    fn index_before_decoding(&self, mut index: usize) -> usize {
+        let mut cursor = 0;
+
+        while cursor < index {
+            if self.slice[cursor] == b'%'
+                && self.slice.len() > cursor + 2
+                && parse_char(&self.slice[(cursor + 1)..(cursor + 2)]).is_some()
+            {
+                index += 3;
+            }
+            cursor += 1;
+        }
+
+        index
+    }
+}
+
+/// Parsing methods
+impl<'de, 'a> ValueDeserializer<'de, 'a> {
+    pub(crate) fn parse_str_bytes<'s, T, F>(
+        &'s mut self,
+        result: F,
+    ) -> Result<Reference<'de, 's, T>>
+    where
+        T: ?Sized + 's,
+        F: for<'f> FnOnce(&Self, &'f [u8]) -> Result<&'f T>,
+    {
+        self.scratch.clear();
+
+        // Index of the first byte not yet copied into the scratch space.
+        let mut index = 0;
+
+        while let Some(v) = self.slice.get(index) {
+            match v {
+                b'+' => {
+                    self.scratch
+                        .extend_from_slice(&self.slice[self.index..index]);
+                    self.scratch.push(b' ');
+
+                    index += 1;
+                    self.index = index;
+                }
+                b'%' => {
+                    // we saw percentage
+                    if self.slice.len() > index + 2 {
+                        match parse_char(&self.slice[(index + 1)..=(index + 2)]) {
+                            Some(b) => {
+                                self.scratch
+                                    .extend_from_slice(&self.slice[self.index..index]);
+                                self.scratch.push(b);
+
+                                index += 3;
+                                self.index = index;
+                            }
+                            None => {
+                                // If it wasn't valid, go to the next byte
+                                index += 1;
+                            }
+                        }
+                    } else {
+                        index += 1;
+                    }
+                }
+                _ => {
+                    index += 1;
+                }
+            }
+        }
+
+        if self.scratch.is_empty() {
+            result(self, self.slice).map(Reference::Borrowed)
+        } else {
+            self.scratch.extend_from_slice(&self.slice[self.index..]);
+            result(self, self.scratch).map(Reference::Copied)
+        }
+    }
+
+    pub(crate) fn parse_str<'s>(&'s mut self) -> Result<Reference<'de, 's, str>> {
+        self.parse_str_bytes(|other_self, bytes| {
+            str::from_utf8(bytes).map_err(|e| other_self.invalid_encoding(e))
+        })
+    }
+
+    pub(crate) fn parse_bytes<'s>(&'s mut self) -> Result<Reference<'de, 's, [u8]>> {
+        self.parse_str_bytes(|_, bytes| Ok(bytes))
+    }
+
+    pub(crate) fn parse_number<'s, T>(&'s mut self) -> Result<T>
+    where
+        T: FromLexical,
+    {
+        let c = match self.parse_bytes()? {
+            Reference::Borrowed(b) => b,
+            Reference::Copied(c) => c,
+        };
+        lexical::parse(c).map_err(|e| self.invalid_number(e))
+    }
+
+    pub(crate) fn parse_bool(&mut self) -> Result<bool> {
+        match self.slice.len() {
+            0 => Ok(true),
+            1 => match self.slice[0] {
+                b'1' => Ok(true),
+                b'0' => Ok(false),
+                _ => Err(self.invalid_boolean()),
+            },
+            2 if self.slice == b"on" => Ok(true),
+            3 if self.slice == b"off" => Ok(false),
+            4 if self.slice == b"true" => Ok(true),
+            5 if self.slice == b"false" => Ok(false),
+            _ => Err(self.invalid_boolean()),
         }
     }
 }
 
-macro_rules! deserialize_number {
-    ($method:ident) => {
-        fn $method<V>(self, visitor: V) -> Result<V::Value>
-        where
-            V: de::Visitor<'de>,
-        {
-            self.deserialize_number(visitor)
-        }
+macro_rules! deserialize_in {
+    ($other_method:ident, $($method:ident) *) => {
+        $(
+            fn $method<V>(self, visitor: V) -> Result<V::Value>
+            where
+                V: de::Visitor<'de>,
+            {
+                self.$other_method(visitor)
+            }
+        )*
     };
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
+impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'de, 'a> {
     type Error = Error;
 
     #[inline]
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        let peek = match self.parser.peek()? {
-            Some(b) => b,
-            None => return visitor.visit_unit(),
-        };
-
-        let value = match peek {
-            b'=' => Err(Error::InvalidMapKey),
-            _ => match self.parser.parse_str(&mut self.scratch)? {
-                Reference::Borrowed(b) => visitor.visit_borrowed_str(b),
-                Reference::Copied(c) => visitor.visit_str(c),
-            },
-        };
-        value
+        match self.parse_str()? {
+            Reference::Borrowed(b) => visitor.visit_borrowed_str(b),
+            Reference::Copied(c) => visitor.visit_str(c),
+        }
     }
 
     #[inline]
@@ -103,46 +245,11 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     }
 
     #[inline]
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_bool<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        if self.flat {
-            return Err(Error::NotSupportedAsValue);
-        }
-        visitor.visit_seq(SeqAccess::new(self))
-    }
-
-    #[inline]
-    fn deserialize_tuple<V>(self, _: usize, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        if self.flat {
-            return Err(Error::NotSupportedAsValue);
-        }
-        visitor.visit_seq(SeqAccess::new(self))
-    }
-
-    #[inline]
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_bool(self.parser.parse_bool()?)
-    }
-
-    #[inline]
-    fn deserialize_tuple_struct<V>(
-        self,
-        _: &'static str,
-        len: usize,
-        visitor: V,
-    ) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.deserialize_tuple(len, visitor)
+        visitor.visit_bool(self.parse_bool()?)
     }
 
     #[inline]
@@ -163,9 +270,10 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     where
         V: de::Visitor<'de>,
     {
-        match self.parser.peek()? {
-            Some(b'&') | Some(b';') | None => visitor.visit_none(),
-            _ => visitor.visit_some(self),
+        if self.slice.len() > 0 {
+            visitor.visit_some(self)
+        } else {
+            visitor.visit_none()
         }
     }
 
@@ -174,27 +282,18 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     where
         V: de::Visitor<'de>,
     {
-        self.parser.parse_ignore()?;
         visitor.visit_unit()
     }
 
     /// We don't check the bytes to be valid utf8
     #[inline]
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_bytes<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        let peek = match self.parser.peek()? {
-            Some(b) => b,
-            None => return visitor.visit_unit(),
-        };
-
-        match peek {
-            b'=' => Err(Error::InvalidMapKey),
-            _ => match self.parser.parse_bytes(&mut self.scratch)? {
-                Reference::Borrowed(b) => visitor.visit_borrowed_bytes(b),
-                Reference::Copied(c) => visitor.visit_bytes(c),
-            },
+        match self.parse_bytes()? {
+            Reference::Borrowed(b) => visitor.visit_borrowed_bytes(b),
+            Reference::Copied(c) => visitor.visit_bytes(c),
         }
     }
 
@@ -209,103 +308,91 @@ impl<'de, 'a> de::Deserializer<'de> for &mut Value<'de, 'a> {
     forward_to_deserialize_any! {
         <W: Visitor<'de>>
         char str string unit unit_struct map struct
-        identifier
+        identifier tuple seq tuple_struct
     }
 
-    deserialize_number!(deserialize_i8);
-    deserialize_number!(deserialize_i16);
-    deserialize_number!(deserialize_i32);
-    deserialize_number!(deserialize_i64);
-    deserialize_number!(deserialize_u8);
-    deserialize_number!(deserialize_u16);
-    deserialize_number!(deserialize_u32);
-    deserialize_number!(deserialize_u64);
+    deserialize_in!(
+        deserialize_signed,
+        deserialize_i8 deserialize_i16 deserialize_i32 deserialize_i64
+    );
 
-    deserialize_number!(deserialize_f32);
-    deserialize_number!(deserialize_f64);
+    deserialize_in!(
+        deserialize_unsigned,
+        deserialize_u8 deserialize_u16 deserialize_u32 deserialize_u64
+    );
+
+    deserialize_in!(
+        deserialize_float,
+        deserialize_f32 deserialize_f64
+    );
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for &mut Value<'de, 'a> {
+impl<'de, 'a> de::EnumAccess<'de> for ValueDeserializer<'de, 'a> {
     type Error = Error;
     type Variant = Self;
 
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant)>
+    fn variant_seed<V>(mut self, seed: V) -> Result<(V::Value, Self::Variant)>
     where
         V: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(
-            self.parser
-                .parse_str(&mut self.scratch)?
-                .into_deserializer(),
-        )
-        .map(|res| (res, self))
+        seed.deserialize(self.parse_str()?.into_deserializer())
+            .map(|res| (res, self))
     }
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for &mut Value<'de, 'a> {
+impl<'de, 'a> de::VariantAccess<'de> for ValueDeserializer<'de, 'a> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
         Ok(())
     }
 
+    #[cold]
     fn tuple_variant<V>(self, _len: usize, _visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::NotSupportedAsValue)
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("Tuple enums are not supported")))
     }
 
+    #[cold]
     fn struct_variant<V>(self, _fields: &'static [&'static str], _visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::NotSupportedAsValue)
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("Struct enums are not supported")))
     }
 
+    #[cold]
     fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value>
     where
         T: de::DeserializeSeed<'de>,
     {
-        Err(Error::NotSupportedAsValue)
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("Newtype enums are not supported")))
     }
 }
 
-pub(crate) struct SeqAccess<'de, 'a, 'b> {
-    value: &'b mut Value<'de, 'a>,
-    end: bool,
+pub(crate) enum Reference<'b, 'c, T>
+where
+    T: ?Sized + 'static,
+{
+    Borrowed(&'b T),
+    Copied(&'c T),
 }
 
-impl<'de, 'a, 'b> SeqAccess<'de, 'a, 'b> {
-    pub(crate) fn new(value: &'b mut Value<'de, 'a>) -> Self {
-        Self { value, end: false }
-    }
-}
+impl<'b, 'c, T> std::ops::Deref for Reference<'b, 'c, T>
+where
+    T: ?Sized + 'static,
+{
+    type Target = T;
 
-impl<'de, 'a, 'b> de::SeqAccess<'de> for SeqAccess<'de, 'a, 'b> {
-    type Error = Error;
-
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        if self.end {
-            return Ok(None);
+    fn deref(&self) -> &Self::Target {
+        match *self {
+            Reference::Borrowed(b) => b,
+            Reference::Copied(c) => c,
         }
-        let res = match self.value.parser.parse_one_seq_value()? {
-            Some(slice) => seed
-                .deserialize(&mut Value::new_flat(&mut Parser::new(slice)))
-                .map(Some),
-            None => Ok(None),
-        };
-        match self.value.parser.peek()? {
-            None | Some(b'&') | Some(b';') => {
-                self.value.parser.discard();
-                self.end = true
-            }
-            Some(b',') => self.value.parser.discard(),
-            _ => {}
-        };
-        res
     }
 }
