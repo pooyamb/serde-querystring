@@ -245,7 +245,7 @@ fn deserialize_invalid_type() {
 
 #[test]
 fn deserialize_invalid_precent_decoding() {
-    assert!(from_str::<Primitive<String>>("value=Test%00").is_err());
+    assert!(from_str::<Primitive<String>>("value=Test%88").is_err());
 }
 
 #[test]
