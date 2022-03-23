@@ -17,7 +17,7 @@ actix-web = "^3"
 derive_more = "0.99"
 log = "0.4"
 serde = "1"
-serde-querystring = "0.1.0"
+serde-querystring = "0.0.8"
 
 [dev-dependencies]
 actix-rt = "^1"
