@@ -13,7 +13,7 @@ impl de::Error for Error {
     where
         T: std::fmt::Display,
     {
-        Error::Custom(msg.to_string())
+        Self::Custom(msg.to_string())
     }
 }
 

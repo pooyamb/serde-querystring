@@ -7,8 +7,8 @@ use serde::{de, forward_to_deserialize_any};
 pub use error::Error;
 
 pub(crate) mod __implementors {
-    pub(crate) use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
-    pub(crate) use super::traits::{IntoDeserializer, IntoSizedIterator};
+    pub use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
+    pub use super::traits::{IntoDeserializer, IntoSizedIterator};
 }
 
 use crate::parsers::{BracketsQS, DelimiterQS, DuplicateQS, UrlEncodedQS};
@@ -91,6 +91,7 @@ where
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Config {
     UrlEncoded,
     Duplicate,

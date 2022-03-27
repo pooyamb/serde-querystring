@@ -1,4 +1,4 @@
-//! These tests are meant for the UrlEncoded method
+//! These tests are meant for the `UrlEncodedQS` method
 
 use std::collections::HashMap;
 

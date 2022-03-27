@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 #[inline]
-pub(crate) fn parse_char(h: u8, l: u8) -> Option<u8> {
+pub fn parse_char(h: u8, l: u8) -> Option<u8> {
     Some(char::from(h).to_digit(16)? as u8 * 0x10 + char::from(l).to_digit(16)? as u8)
 }
 
 /// Decode a slice to the scratch or directly return the slice if not encoded
-pub(crate) fn parse_bytes<'de, 's>(
+pub fn parse_bytes<'de, 's>(
     slice: &'de [u8],
     scratch: &'s mut Vec<u8>,
 ) -> Reference<'de, 's, [u8]> {

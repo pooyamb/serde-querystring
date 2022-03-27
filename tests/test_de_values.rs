@@ -32,45 +32,36 @@ macro_rules! p {
 #[test]
 fn deserialize_integer_valid() {
     // u8
-    assert_eq!(from_str("value=255"), Ok(p!(255_u8)));
-    assert_eq!(from_str("value=0"), Ok(p!(0_u8)));
+    assert_eq!(from_str("value=255"), Ok(p!(u8::MAX)));
+    assert_eq!(from_str("value=0"), Ok(p!(u8::MIN)));
 
     // i8
-    assert_eq!(from_str("value=127"), Ok(p!(127_i8)));
-    assert_eq!(from_str("value=-128"), Ok(p!(-128_i8)));
+    assert_eq!(from_str("value=127"), Ok(p!(i8::MAX)));
+    assert_eq!(from_str("value=-128"), Ok(p!(i8::MIN)));
 
     // u16
-    assert_eq!(from_str("value=65535"), Ok(p!(65535_u16)));
-    assert_eq!(from_str("value=0"), Ok(p!(0_u16)));
+    assert_eq!(from_str("value=65535"), Ok(p!(u16::MAX)));
+    assert_eq!(from_str("value=0"), Ok(p!(u16::MIN)));
 
     // i16
-    assert_eq!(from_str("value=32767"), Ok(p!(32767_i16)));
-    assert_eq!(from_str("value=-32768"), Ok(p!(-32768_i16)));
+    assert_eq!(from_str("value=32767"), Ok(p!(i16::MAX)));
+    assert_eq!(from_str("value=-32768"), Ok(p!(i16::MIN)));
 
     // u32
-    assert_eq!(from_str("value=4294967295"), Ok(p!(4294967295_u32)));
-    assert_eq!(from_str("value=0"), Ok(p!(0_u32)));
+    assert_eq!(from_str("value=4294967295"), Ok(p!(u32::MAX)));
+    assert_eq!(from_str("value=0"), Ok(p!(u32::MIN)));
 
     // i32
-    assert_eq!(from_str("value=2147483647"), Ok(p!(2147483647_i32)));
-    assert_eq!(from_str("value=-2147483648"), Ok(p!(-2147483648_i32)));
+    assert_eq!(from_str("value=2147483647"), Ok(p!(i32::MAX)));
+    assert_eq!(from_str("value=-2147483648"), Ok(p!(i32::MIN)));
 
     // u64
-    assert_eq!(
-        from_str("value=18446744073709551615"),
-        Ok(p!(18446744073709551615_u64))
-    );
-    assert_eq!(from_str("value=0"), Ok(p!(0_u64)));
+    assert_eq!(from_str("value=18446744073709551615"), Ok(p!(u64::MAX)));
+    assert_eq!(from_str("value=0"), Ok(p!(u64::MIN)));
 
     // i64
-    assert_eq!(
-        from_str("value=9223372036854775807"),
-        Ok(p!(9223372036854775807_i64))
-    );
-    assert_eq!(
-        from_str("value=-9223372036854775808"),
-        Ok(p!(-9223372036854775808_i64))
-    );
+    assert_eq!(from_str("value=9223372036854775807"), Ok(p!(i64::MAX)));
+    assert_eq!(from_str("value=-9223372036854775808"), Ok(p!(i64::MIN)));
 }
 
 #[test]
@@ -83,11 +74,11 @@ fn deserialize_float_valid() {
     assert_eq!(from_str("value=-1.2E-5"), Ok(p!(-1.2E-5_f64)));
     assert_eq!(
         from_str("value=18446744073709551616"),
-        Ok(p!(18446744073709551616_f64))
+        Ok(p!(18_446_744_073_709_551_616_f64))
     );
     assert_eq!(
         from_str("value=-18446744073709551616"),
-        Ok(p!(-18446744073709551616_f64))
+        Ok(p!(-18_446_744_073_709_551_616_f64))
     );
 }
 

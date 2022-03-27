@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, Reference};
 
-pub(crate) struct Key<'a> {
+pub struct Key<'a> {
     slice: &'a [u8],
 }
 
@@ -30,7 +30,7 @@ impl<'a> Key<'a> {
     }
 }
 
-pub(crate) struct Value<'a>(&'a [u8]);
+pub struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
@@ -103,7 +103,7 @@ impl<'a> DuplicateQS<'a> {
             let decoded_key = pair.0.decode_to(&mut scratch);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
-                values.push(pair)
+                values.push(pair);
             } else {
                 pairs.insert(decoded_key.into_cow(), vec![pair]);
             }
@@ -143,7 +143,7 @@ impl<'a> DuplicateQS<'a> {
             self.pairs
                 .get(key)?
                 .iter()
-                .map(|p| p.1.as_ref().map(|v| v.slice()))
+                .map(|p| p.1.as_ref().map(Value::slice))
                 .collect(),
         )
     }
@@ -153,7 +153,7 @@ impl<'a> DuplicateQS<'a> {
             .get(key)?
             .iter()
             .last()
-            .map(|p| p.1.as_ref().map(|v| v.slice()))
+            .map(|p| p.1.as_ref().map(Value::slice))
     }
 }
 
@@ -188,7 +188,7 @@ mod de {
         }
     }
 
-    pub(crate) struct DuplicateValueIter<I>(I);
+    pub struct DuplicateValueIter<I>(I);
 
     impl<'a, I> IntoSizedIterator<'a> for DuplicateValueIter<I>
     where

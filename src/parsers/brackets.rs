@@ -166,7 +166,7 @@ impl<'a> BracketsQS<'a> {
             let decoded_key = pair.0.decode_to(&mut scratch);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
-                values.push(pair)
+                values.push(pair);
             } else {
                 pairs.insert(decoded_key.into_cow(), vec![pair]);
             }
@@ -189,7 +189,7 @@ impl<'a> BracketsQS<'a> {
             let pair = Pair::new(k, v);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
-                values.push(pair)
+                values.push(pair);
             } else {
                 pairs.insert(decoded_key.into_cow(), vec![pair]);
             }
@@ -262,7 +262,7 @@ mod de {
 
     use super::{BracketsQS, Pair};
 
-    pub(crate) struct Pairs<'a>(Vec<Pair<'a>>);
+    pub struct Pairs<'a>(Vec<Pair<'a>>);
 
     impl<'a> BracketsQS<'a> {
         pub(crate) fn into_iter(self) -> impl Iterator<Item = (ParsedSlice<'a>, Pairs<'a>)> {
@@ -280,7 +280,7 @@ mod de {
         }
     }
 
-    pub(crate) struct PairsDeserializer<'a, 's>(Vec<Pair<'a>>, &'s mut Vec<u8>);
+    pub struct PairsDeserializer<'a, 's>(Vec<Pair<'a>>, &'s mut Vec<u8>);
 
     macro_rules! forware_to_slice_deserializer {
         ($($method:ident ,)*) => {

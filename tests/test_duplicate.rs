@@ -1,4 +1,4 @@
-//! These tests are meant for the Simple method
+//! These tests are meant for the `DuplicateQS` method
 
 use std::collections::HashMap;
 

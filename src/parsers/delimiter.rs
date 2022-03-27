@@ -209,7 +209,7 @@ mod de {
         }
     }
 
-    pub(crate) struct SeparatorValues<'a> {
+    pub struct SeparatorValues<'a> {
         slice: &'a [u8],
         delimiter: u8,
     }
@@ -238,7 +238,7 @@ mod de {
         }
     }
 
-    pub(crate) struct SizedValuesIterator<'a> {
+    pub struct SizedValuesIterator<'a> {
         slice: &'a [u8],
         delimiter: u8,
         remaining: Option<usize>,
@@ -258,7 +258,7 @@ mod de {
         #[inline]
         fn decrease_remaining(&mut self) {
             if let Some(remaining) = self.remaining {
-                self.remaining = Some(remaining - 1)
+                self.remaining = Some(remaining - 1);
             }
         }
     }
