@@ -31,23 +31,27 @@ macro_rules! p {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1|3|1337", Config::Separator(b'|')),
+        Ok(p!(vec![1, 3, 1337]))
+    );
+    assert_eq!(
+        from_bytes(b"value=1,3,1337", Config::Separator(b',')),
         Ok(p!(vec![1, 3, 1337]))
     );
 
     // array
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1|3|1337", Config::Separator(b'|')),
         Ok(p!([1, 3, 1337]))
     );
 
     // tuple
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1|3|1337", Config::Separator(b'|')),
         Ok(p!((1, 3, 1337)))
     );
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1|3|1337", Config::Separator(b'|')),
         Ok(p!((true, "3", 1337)))
     );
 }
@@ -67,7 +71,7 @@ fn deserialize_unit_variants() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Duplicate),
+        from_bytes(b"God=winner&Right=looser", Config::Separator(b'|')),
         Ok(map)
     );
 
@@ -78,7 +82,7 @@ fn deserialize_unit_variants() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Duplicate),
+        from_bytes::<A>(b"looser=Left&winner=God", Config::Separator(b'|')),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -93,7 +97,7 @@ fn deserialize_unit_variants() {
 
     // unit enums in sequence
     assert_eq!(
-        from_bytes(b"value=God&value=Left&value=Right", Config::Duplicate),
+        from_bytes(b"value=God|Left|Right", Config::Separator(b'|')),
         Ok(VecEnum {
             value: vec![Side::God, Side::Left, Side::Right]
         })
@@ -103,33 +107,22 @@ fn deserialize_unit_variants() {
 #[test]
 fn deserialize_invalid_sequence() {
     // array length
-    assert!(from_bytes::<Primitive<[usize; 3]>>(
-        b"value=1&value=3&value=1337&value=999",
-        Config::Duplicate
-    )
-    .is_err());
+    assert!(
+        from_bytes::<Primitive<[usize; 3]>>(b"value=1|3|1337|999", Config::Separator(b'|'))
+            .is_err()
+    );
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
-        b"value=1&value=3&value=1337&value=999",
-        Config::Duplicate
+        b"1|3|1337|999",
+        Config::Separator(b'|')
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
-        b"value=foo&value=bar&value=baz",
-        Config::Duplicate
+        b"value=foo|bar|baz",
+        Config::Separator(b'|')
     )
     .is_err());
-}
-
-#[test]
-fn deserialize_decoded_keys() {
-    // having different encoded kinds of the string `value` for key
-    // `v%61lu%65` `valu%65` `value`
-    assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Duplicate),
-        Ok(p!(vec!["1", "2", "3"]))
-    );
 }

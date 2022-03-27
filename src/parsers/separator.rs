@@ -188,24 +188,116 @@ impl<'a> SeparatorQueryString<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::{ParsedSlice, RawSlice};
+    use crate::de::__implementors::{IntoSizedIterator, ParsedSlice, RawSlice};
 
     use super::SeparatorQueryString;
 
     impl<'a> SeparatorQueryString<'a> {
         pub(crate) fn into_iter(
             self,
-        ) -> impl Iterator<Item = (ParsedSlice<'a>, impl Iterator<Item = RawSlice<'a>>)> {
+        ) -> impl Iterator<Item = (ParsedSlice<'a>, SeparatorValues<'a>)> {
             let delimiter = self.delimiter;
             self.pairs.into_iter().map(move |(key, pair)| {
                 (
                     ParsedSlice(key),
-                    pair.1
-                        .unwrap_or_default()
-                        .values(delimiter)
-                        .map(|v| RawSlice(v.slice())),
+                    SeparatorValues::from_slice(
+                        pair.1.map(|v| v.slice).unwrap_or_default(),
+                        delimiter,
+                    ),
                 )
             })
+        }
+    }
+
+    pub(crate) struct SeparatorValues<'a> {
+        slice: &'a [u8],
+        delimiter: u8,
+    }
+
+    impl<'a> SeparatorValues<'a> {
+        fn from_slice(slice: &'a [u8], delimiter: u8) -> Self {
+            Self { slice, delimiter }
+        }
+    }
+
+    impl<'a> IntoSizedIterator<'a> for SeparatorValues<'a> {
+        type SizedIterator = SizedValuesIterator<'a>;
+
+        type UnSizedIterator = SizedValuesIterator<'a>;
+
+        fn into_sized_iterator(self, size: usize) -> Result<Self::SizedIterator, crate::de::Error> {
+            Ok(SizedValuesIterator::new(
+                self.slice,
+                self.delimiter,
+                Some(size),
+            ))
+        }
+
+        fn into_unsized_iterator(self) -> Self::UnSizedIterator {
+            SizedValuesIterator::new(self.slice, self.delimiter, None)
+        }
+    }
+
+    pub(crate) struct SizedValuesIterator<'a> {
+        slice: &'a [u8],
+        delimiter: u8,
+        remaining: Option<usize>,
+        index: usize,
+    }
+
+    impl<'a> SizedValuesIterator<'a> {
+        fn new(slice: &'a [u8], delimiter: u8, size: Option<usize>) -> Self {
+            Self {
+                slice,
+                delimiter,
+                remaining: size,
+                index: 0,
+            }
+        }
+
+        #[inline]
+        fn decrease_remaining(&mut self) {
+            if let Some(remaining) = self.remaining {
+                self.remaining = Some(remaining - 1)
+            }
+        }
+    }
+
+    impl<'a> Iterator for SizedValuesIterator<'a> {
+        type Item = RawSlice<'a>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.index >= self.slice.len() {
+                return None;
+            }
+
+            if let Some(remaining) = self.remaining {
+                match remaining {
+                    0 => {
+                        return None;
+                    }
+                    1 => {
+                        self.remaining = Some(0);
+                        return Some(RawSlice(&self.slice[self.index..]));
+                    }
+                    _ => {}
+                }
+            }
+
+            let start = self.index;
+            for c in &self.slice[self.index..] {
+                if *c == self.delimiter {
+                    let end = self.index;
+                    self.index += 1;
+
+                    self.decrease_remaining();
+                    return Some(RawSlice(&self.slice[start..end]));
+                }
+                self.index += 1;
+            }
+
+            self.decrease_remaining();
+            Some(RawSlice(&self.slice[start..]))
         }
     }
 }

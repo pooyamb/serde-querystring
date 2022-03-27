@@ -424,9 +424,17 @@ impl<'de, 's> IntoDeserializer<'de, 's> for OptionalRawSlice<'de> {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub trait IntoSizedIterator<'de> {
+    type SizedIterator: Iterator<Item = RawSlice<'de>>;
+    type UnSizedIterator: Iterator<Item = RawSlice<'de>>;
+
+    fn into_sized_iterator(self, size: usize) -> Result<Self::SizedIterator, Error>;
+    fn into_unsized_iterator(self) -> Self::UnSizedIterator;
+}
+
 impl<'de, 's, I> IntoDeserializer<'de, 's> for I
 where
-    I: 'de + Iterator<Item = RawSlice<'de>>,
+    I: 'de + IntoSizedIterator<'de>,
 {
     type Deserializer = IterDeserializer<'s, I>;
 
@@ -439,26 +447,31 @@ pub struct IterDeserializer<'s, I>(I, &'s mut Vec<u8>);
 
 impl<'de, 's, I> IterDeserializer<'s, I>
 where
-    I: Iterator<Item = RawSlice<'de>>,
+    I: 'de + IntoSizedIterator<'de>,
 {
     fn parse_number<T>(self) -> Result<T, Error>
     where
         T: FromLexical,
     {
+        self.into_slice_deserializer().parse_number()
+    }
+
+    #[inline]
+    fn into_slice_deserializer(self) -> SliceDeserializer<'de, 's> {
         SliceDeserializer(
             self.0
+                .into_unsized_iterator()
                 .last()
                 .expect("Values iterator has no value inside it")
                 .0,
             self.1,
         )
-        .parse_number()
     }
 }
 
 impl<'de, 's, I> de::Deserializer<'de> for IterDeserializer<'s, I>
 where
-    I: 'de + Iterator<Item = RawSlice<'de>>,
+    I: 'de + IntoSizedIterator<'de>,
 {
     type Error = Error;
 
@@ -467,11 +480,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let v = self
-            .0
-            .last()
-            .expect("Values iterator has no value inside it");
-        SliceDeserializer(v.0, self.1).deserialize_any(visitor)
+        self.into_slice_deserializer().deserialize_any(visitor)
     }
 
     #[inline]
@@ -487,14 +496,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        SliceDeserializer(
-            self.0
-                .last()
-                .expect("Values iterator has no value inside it")
-                .0,
-            self.1,
-        )
-        .deserialize_bool(visitor)
+        self.into_slice_deserializer().deserialize_bool(visitor)
     }
 
     #[inline]
@@ -507,14 +509,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        SliceDeserializer(
-            self.0
-                .last()
-                .expect("Values iterator has no value inside it")
-                .0,
-            self.1,
-        )
-        .deserialize_enum(name, variants, visitor)
+        self.into_slice_deserializer()
+            .deserialize_enum(name, variants, visitor)
     }
 
     #[inline]
@@ -522,14 +518,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        SliceDeserializer(
-            self.0
-                .last()
-                .expect("Values iterator has no value inside it")
-                .0,
-            self.1,
-        )
-        .deserialize_option(visitor)
+        self.into_slice_deserializer().deserialize_option(visitor)
     }
 
     #[inline]
@@ -546,14 +535,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        SliceDeserializer(
-            self.0
-                .last()
-                .expect("Values iterator has no value inside it")
-                .0,
-            self.1,
-        )
-        .deserialize_bytes(visitor)
+        self.into_slice_deserializer().deserialize_bytes(visitor)
     }
 
     #[inline]
@@ -568,18 +550,20 @@ where
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_seq(self)
+        visitor.visit_seq(SizedIterDeserializer(
+            self.0.into_unsized_iterator(),
+            self.1,
+        ))
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        if len == self.0.size_hint().0 {
-            visitor.visit_seq(self)
-        } else {
-            Err(Error::Custom("Seq length is wrong".to_string()))
-        }
+        visitor.visit_seq(SizedIterDeserializer(
+            self.0.into_sized_iterator(len)?,
+            self.1,
+        ))
     }
 
     fn deserialize_tuple_struct<V>(
@@ -591,11 +575,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        if len == self.0.size_hint().0 {
-            visitor.visit_seq(self)
-        } else {
-            Err(Error::Custom("Seq length is wrong".to_string()))
-        }
+        visitor.visit_seq(SizedIterDeserializer(
+            self.0.into_sized_iterator(len)?,
+            self.1,
+        ))
     }
 
     forward_to_deserialize_any! {
@@ -619,7 +602,9 @@ where
     );
 }
 
-impl<'de, 's, I> de::SeqAccess<'de> for IterDeserializer<'s, I>
+struct SizedIterDeserializer<'s, I>(I, &'s mut Vec<u8>);
+
+impl<'de, 's, I> de::SeqAccess<'de> for SizedIterDeserializer<'s, I>
 where
     I: 'de + Iterator<Item = RawSlice<'de>>,
 {

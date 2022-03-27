@@ -159,22 +159,54 @@ impl<'a> DuplicateQueryString<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::{ParsedSlice, RawSlice};
+    use crate::de::{
+        Error,
+        __implementors::{IntoSizedIterator, ParsedSlice, RawSlice},
+    };
 
     use super::DuplicateQueryString;
 
     impl<'a> DuplicateQueryString<'a> {
         pub(crate) fn into_iter(
             self,
-        ) -> impl Iterator<Item = (ParsedSlice<'a>, impl Iterator<Item = RawSlice<'a>>)> {
+        ) -> impl Iterator<
+            Item = (
+                ParsedSlice<'a>,
+                DuplicateValueIter<impl Iterator<Item = RawSlice<'a>>>,
+            ),
+        > {
             self.pairs.into_iter().map(|(key, pairs)| {
                 (
                     ParsedSlice(key),
-                    pairs
-                        .into_iter()
-                        .map(|v| RawSlice(v.1.map(|v| v.slice()).unwrap_or_default())),
+                    DuplicateValueIter(
+                        pairs
+                            .into_iter()
+                            .map(|v| RawSlice(v.1.map(|v| v.slice()).unwrap_or_default())),
+                    ),
                 )
             })
+        }
+    }
+
+    pub(crate) struct DuplicateValueIter<I>(I);
+
+    impl<'a, I> IntoSizedIterator<'a> for DuplicateValueIter<I>
+    where
+        I: Iterator<Item = RawSlice<'a>>,
+    {
+        type SizedIterator = I;
+        type UnSizedIterator = I;
+
+        fn into_sized_iterator(self, size: usize) -> Result<I, Error> {
+            if self.0.size_hint().0 == size {
+                Ok(self.0)
+            } else {
+                Err(Error::Custom("()".to_string()))
+            }
+        }
+
+        fn into_unsized_iterator(self) -> I {
+            self.0
         }
     }
 }

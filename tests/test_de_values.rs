@@ -1,10 +1,10 @@
 //! These tests are common between different deserialization methods
 
 use serde::Deserialize;
-use serde_querystring::{from_bytes, Error};
+use serde_querystring::de::{from_bytes, Config, Error};
 
 fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
-    from_bytes(input.as_bytes(), serde_querystring::Config::Simple)
+    from_bytes(input.as_bytes(), Config::Simple)
 }
 
 /// It is a helper struct we use to test primitive types

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_querystring::{from_bytes, Config};
+use serde_querystring::de::{from_bytes, Config};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level

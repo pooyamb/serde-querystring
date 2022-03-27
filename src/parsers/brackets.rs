@@ -255,7 +255,10 @@ impl<'a> BracketsQueryString<'a> {
 mod de {
     use serde::{de, forward_to_deserialize_any};
 
-    use crate::de::{Error, IntoDeserializer, ParsedSlice, RawSlice};
+    use crate::de::{
+        Error,
+        __implementors::{IntoDeserializer, ParsedSlice, RawSlice},
+    };
 
     use super::{BracketsQueryString, Pair};
 

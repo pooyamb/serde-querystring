@@ -134,7 +134,7 @@ impl<'a> SimpleQueryString<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::{OptionalRawSlice, ParsedSlice};
+    use crate::de::__implementors::{OptionalRawSlice, ParsedSlice};
 
     use super::SimpleQueryString;
 

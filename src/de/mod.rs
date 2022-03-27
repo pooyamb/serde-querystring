@@ -5,8 +5,13 @@ mod traits;
 use serde::{de, forward_to_deserialize_any};
 
 pub use error::Error;
-pub use slices::{OptionalRawSlice, ParsedSlice, RawSlice};
-pub use traits::{IntoDeserializer, IterDeserializer, SliceDeserializer};
+
+pub(crate) mod __implementors {
+    pub(crate) use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
+    pub(crate) use super::traits::{IntoDeserializer, IntoSizedIterator};
+}
+
+use crate::{BracketsQueryString, DuplicateQueryString, SeparatorQueryString, SimpleQueryString};
 
 pub struct QSDeserializer<I, T> {
     iter: I,
@@ -18,8 +23,8 @@ impl<I, T> QSDeserializer<I, T> {
     pub fn new<'de, E, A>(iter: I) -> Self
     where
         I: Iterator<Item = (E, A)>,
-        for<'a> E: IntoDeserializer<'de, 'a>,
-        for<'a> A: IntoDeserializer<'de, 'a>,
+        for<'a> E: __implementors::IntoDeserializer<'de, 'a>,
+        for<'a> A: __implementors::IntoDeserializer<'de, 'a>,
     {
         Self {
             iter,
@@ -32,8 +37,8 @@ impl<I, T> QSDeserializer<I, T> {
 impl<'de, I, E, A> de::Deserializer<'de> for QSDeserializer<I, A>
 where
     I: Iterator<Item = (E, A)>,
-    for<'s> E: IntoDeserializer<'de, 's>,
-    for<'s> A: IntoDeserializer<'de, 's>,
+    for<'s> E: __implementors::IntoDeserializer<'de, 's>,
+    for<'s> A: __implementors::IntoDeserializer<'de, 's>,
 {
     type Error = Error;
 
@@ -54,8 +59,8 @@ where
 impl<'de, I, E, A> de::MapAccess<'de> for QSDeserializer<I, A>
 where
     I: Iterator<Item = (E, A)>,
-    for<'s> E: IntoDeserializer<'de, 's>,
-    for<'s> A: IntoDeserializer<'de, 's>,
+    for<'s> E: __implementors::IntoDeserializer<'de, 's>,
+    for<'s> A: __implementors::IntoDeserializer<'de, 's>,
 {
     type Error = Error;
 
@@ -83,6 +88,45 @@ where
             .take()
             .expect("Method next_value called before next_key");
         seed.deserialize(value.into_deserializer(&mut self.scratch))
+    }
+}
+
+pub enum Config {
+    Simple,
+    Duplicate,
+    Separator(u8),
+    Brackets,
+}
+
+pub fn from_bytes<'de, T>(input: &'de [u8], config: Config) -> Result<T, Error>
+where
+    T: de::Deserialize<'de>,
+{
+    match config {
+        Config::Simple => {
+            // A simple key=value parser
+            T::deserialize(QSDeserializer::new(
+                SimpleQueryString::parse(input).into_iter(),
+            ))
+        }
+        Config::Duplicate => {
+            // A parser with duplicated keys interpreted as sequence
+            T::deserialize(QSDeserializer::new(
+                DuplicateQueryString::parse(input).into_iter(),
+            ))
+        }
+        Config::Separator(s) => {
+            // A parser with sequences of values seperated by one character
+            T::deserialize(QSDeserializer::new(
+                SeparatorQueryString::parse(input, s).into_iter(),
+            ))
+        }
+        Config::Brackets => {
+            // A PHP like interpretation of querystrings
+            T::deserialize(QSDeserializer::new(
+                BracketsQueryString::parse(input).into_iter(),
+            ))
+        }
     }
 }
 
