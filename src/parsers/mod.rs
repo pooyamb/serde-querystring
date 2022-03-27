@@ -1,9 +1,9 @@
 mod brackets;
+mod delimiter;
 mod duplicate;
-mod separator;
-mod simple;
+mod urlencoded;
 
-pub use brackets::BracketsQueryString;
-pub use duplicate::DuplicateQueryString;
-pub use separator::SeparatorQueryString;
-pub use simple::SimpleQueryString;
+pub use brackets::BracketsQS;
+pub use delimiter::DelimiterQS;
+pub use duplicate::DuplicateQS;
+pub use urlencoded::UrlEncodedQS;

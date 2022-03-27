@@ -89,11 +89,11 @@ impl<'a> Pair<'a> {
     }
 }
 
-pub struct SimpleQueryString<'a> {
+pub struct UrlEncodedQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>>,
 }
 
-impl<'a> SimpleQueryString<'a> {
+impl<'a> UrlEncodedQS<'a> {
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -136,9 +136,9 @@ impl<'a> SimpleQueryString<'a> {
 mod de {
     use crate::de::__implementors::{OptionalRawSlice, ParsedSlice};
 
-    use super::SimpleQueryString;
+    use super::UrlEncodedQS;
 
-    impl<'a> SimpleQueryString<'a> {
+    impl<'a> UrlEncodedQS<'a> {
         pub(crate) fn into_iter(
             self,
         ) -> impl Iterator<Item = (ParsedSlice<'a>, OptionalRawSlice<'a>)> {
@@ -153,13 +153,13 @@ mod de {
 mod tests {
     use std::borrow::Cow;
 
-    use super::SimpleQueryString;
+    use super::UrlEncodedQS;
 
     #[test]
     fn parse_pair() {
         let slice = b"key=value";
 
-        let parser = SimpleQueryString::parse(slice);
+        let parser = UrlEncodedQS::parse(slice);
 
         assert_eq!(parser.keys(), vec![&Cow::Borrowed(b"key")]);
         assert_eq!(
@@ -174,7 +174,7 @@ mod tests {
     fn parse_multiple_pairs() {
         let slice = b"foo=bar&foobar=baz&qux=box";
 
-        let parser = SimpleQueryString::parse(slice);
+        let parser = UrlEncodedQS::parse(slice);
 
         assert_eq!(parser.value(b"foo"), Some(Some("bar".as_bytes().into())));
         assert_eq!(parser.value(b"foobar"), Some(Some("baz".as_bytes().into())));
@@ -185,7 +185,7 @@ mod tests {
     fn parse_no_value() {
         let slice = b"foo&foobar=";
 
-        let parser = SimpleQueryString::parse(slice);
+        let parser = UrlEncodedQS::parse(slice);
 
         assert_eq!(parser.value(b"foo"), Some(None));
         assert_eq!(parser.value(b"foobar"), Some(Some("".as_bytes().into())));
@@ -195,7 +195,7 @@ mod tests {
     fn parse_multiple_values() {
         let slice = b"foo=bar&foo=baz&foo=foobar&foo&foo=";
 
-        let parser = SimpleQueryString::parse(slice);
+        let parser = UrlEncodedQS::parse(slice);
 
         assert_eq!(parser.value(b"foo"), Some(Some("".as_bytes().into())));
     }

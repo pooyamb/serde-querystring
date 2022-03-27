@@ -85,11 +85,11 @@ impl<'a> Pair<'a> {
     }
 }
 
-pub struct DuplicateQueryString<'a> {
+pub struct DuplicateQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>>,
 }
 
-impl<'a> DuplicateQueryString<'a> {
+impl<'a> DuplicateQS<'a> {
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -164,9 +164,9 @@ mod de {
         __implementors::{IntoSizedIterator, ParsedSlice, RawSlice},
     };
 
-    use super::DuplicateQueryString;
+    use super::DuplicateQS;
 
-    impl<'a> DuplicateQueryString<'a> {
+    impl<'a> DuplicateQS<'a> {
         pub(crate) fn into_iter(
             self,
         ) -> impl Iterator<
@@ -215,13 +215,13 @@ mod de {
 mod tests {
     use std::borrow::Cow;
 
-    use super::DuplicateQueryString;
+    use super::DuplicateQS;
 
     #[test]
     fn parse_pair() {
         let slice = b"key=value";
 
-        let parser = DuplicateQueryString::parse(slice);
+        let parser = DuplicateQS::parse(slice);
 
         assert_eq!(parser.keys(), vec![&Cow::Borrowed(b"key")]);
         assert_eq!(
@@ -240,7 +240,7 @@ mod tests {
     fn parse_multiple_pairs() {
         let slice = b"foo=bar&foobar=baz&qux=box";
 
-        let parser = DuplicateQueryString::parse(slice);
+        let parser = DuplicateQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),
@@ -260,7 +260,7 @@ mod tests {
     fn parse_no_value() {
         let slice = b"foo&foobar=";
 
-        let parser = DuplicateQueryString::parse(slice);
+        let parser = DuplicateQS::parse(slice);
 
         assert_eq!(parser.values(b"foo"), Some(vec![None]));
         assert_eq!(
@@ -273,7 +273,7 @@ mod tests {
     fn parse_multiple_values() {
         let slice = b"foo=bar&foo=baz&foo=foobar&foo&foo=";
 
-        let parser = DuplicateQueryString::parse(slice);
+        let parser = DuplicateQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),

@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_querystring::de::{from_bytes, Config, Error};
 
 fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
-    from_bytes(input.as_bytes(), Config::Simple)
+    from_bytes(input.as_bytes(), Config::UrlEncoded)
 }
 
 /// It is a helper struct we use to test primitive types

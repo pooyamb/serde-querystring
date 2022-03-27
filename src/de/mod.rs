@@ -11,7 +11,7 @@ pub(crate) mod __implementors {
     pub(crate) use super::traits::{IntoDeserializer, IntoSizedIterator};
 }
 
-use crate::{BracketsQueryString, DuplicateQueryString, SeparatorQueryString, SimpleQueryString};
+use crate::parsers::{BracketsQS, DelimiterQS, DuplicateQS, UrlEncodedQS};
 
 pub struct QSDeserializer<I, T> {
     iter: I,
@@ -92,9 +92,9 @@ where
 }
 
 pub enum Config {
-    Simple,
+    UrlEncoded,
     Duplicate,
-    Separator(u8),
+    Delimiter(u8),
     Brackets,
 }
 
@@ -103,29 +103,23 @@ where
     T: de::Deserialize<'de>,
 {
     match config {
-        Config::Simple => {
+        Config::UrlEncoded => {
             // A simple key=value parser
-            T::deserialize(QSDeserializer::new(
-                SimpleQueryString::parse(input).into_iter(),
-            ))
+            T::deserialize(QSDeserializer::new(UrlEncodedQS::parse(input).into_iter()))
         }
         Config::Duplicate => {
             // A parser with duplicated keys interpreted as sequence
-            T::deserialize(QSDeserializer::new(
-                DuplicateQueryString::parse(input).into_iter(),
-            ))
+            T::deserialize(QSDeserializer::new(DuplicateQS::parse(input).into_iter()))
         }
-        Config::Separator(s) => {
+        Config::Delimiter(s) => {
             // A parser with sequences of values seperated by one character
             T::deserialize(QSDeserializer::new(
-                SeparatorQueryString::parse(input, s).into_iter(),
+                DelimiterQS::parse(input, s).into_iter(),
             ))
         }
         Config::Brackets => {
             // A PHP like interpretation of querystrings
-            T::deserialize(QSDeserializer::new(
-                BracketsQueryString::parse(input).into_iter(),
-            ))
+            T::deserialize(QSDeserializer::new(BracketsQS::parse(input).into_iter()))
         }
     }
 }
@@ -134,10 +128,7 @@ where
 mod tests {
     use serde::Deserialize;
 
-    use crate::{
-        de::QSDeserializer, BracketsQueryString, DuplicateQueryString, SeparatorQueryString,
-        SimpleQueryString,
-    };
+    use crate::{de::QSDeserializer, parsers};
 
     #[test]
     fn deserialize_simple() {
@@ -151,7 +142,7 @@ mod tests {
 
         let slice = b"foo=bar&foobar=1337&foo=baz&bar=13";
 
-        let qs = SimpleQueryString::parse(slice);
+        let qs = parsers::UrlEncodedQS::parse(slice);
         let de = QSDeserializer::new(qs.into_iter());
 
         assert_eq!(
@@ -178,7 +169,7 @@ mod tests {
         let slice = b"foo=bar&foobar=1337&foo=baz&bar=13&\
                         vec=1337&vec=11";
 
-        let qs = DuplicateQueryString::parse(slice);
+        let qs = parsers::DuplicateQS::parse(slice);
         let de = QSDeserializer::new(qs.into_iter());
 
         assert_eq!(
@@ -206,7 +197,7 @@ mod tests {
         let slice = b"foo=bar&foobar=1337&foo=baz&bar=13&\
                         vec=1337|11";
 
-        let qs = SeparatorQueryString::parse(slice, b'|');
+        let qs = parsers::DelimiterQS::parse(slice, b'|');
         let de = QSDeserializer::new(qs.into_iter());
 
         assert_eq!(
@@ -234,7 +225,7 @@ mod tests {
         let slice = b"foo=bar&foobar=1337&foo=baz&bar=13&\
                         vec[1]=1337&vec=11";
 
-        let qs = BracketsQueryString::parse(slice);
+        let qs = parsers::BracketsQS::parse(slice);
         let de = QSDeserializer::new(qs.into_iter());
 
         assert_eq!(
@@ -263,7 +254,7 @@ mod tests {
 
         let slice = b"foo[bar]=baz&qux[bar]=foobar";
 
-        let qs = BracketsQueryString::parse(slice);
+        let qs = parsers::BracketsQS::parse(slice);
         let de = QSDeserializer::new(qs.into_iter());
 
         assert_eq!(

@@ -1,4 +1,4 @@
-//! These tests are meant for the Simple method
+//! These tests are meant for the UrlEncoded method
 
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ macro_rules! p {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Simple),
+        from_bytes(b"value=1&value=3&value=1337", Config::UrlEncoded),
         Ok(p!(1337))
     );
 }
@@ -51,7 +51,7 @@ fn deserialize_unit_variants() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Simple),
+        from_bytes(b"God=winner&Right=looser", Config::UrlEncoded),
         Ok(map)
     );
 
@@ -62,7 +62,7 @@ fn deserialize_unit_variants() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Simple),
+        from_bytes::<A>(b"looser=Left&winner=God", Config::UrlEncoded),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -75,21 +75,21 @@ fn deserialize_invalid_sequence() {
     // array length
     assert!(from_bytes::<Primitive<[usize; 3]>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Simple
+        Config::UrlEncoded
     )
     .is_err());
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Simple
+        Config::UrlEncoded
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
         b"value=foo&value=bar&value=baz",
-        Config::Simple
+        Config::UrlEncoded
     )
     .is_err());
 }
@@ -99,7 +99,7 @@ fn deserialize_decoded_keys() {
     // having different encoded kinds of the string `value` for key
     // `v%61lu%65` `valu%65` `value`
     assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Simple),
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::UrlEncoded),
         Ok(p!(3))
     );
 }

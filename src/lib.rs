@@ -1,9 +1,6 @@
 mod decode;
-mod parsers;
 
-pub use parsers::{
-    BracketsQueryString, DuplicateQueryString, SeparatorQueryString, SimpleQueryString,
-};
+pub mod parsers;
 
 #[cfg(feature = "serde")]
 pub mod de;

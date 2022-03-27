@@ -115,12 +115,12 @@ impl<'a> Pair<'a> {
     }
 }
 
-pub struct SeparatorQueryString<'a> {
+pub struct DelimiterQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>>,
     delimiter: u8,
 }
 
-impl<'a> SeparatorQueryString<'a> {
+impl<'a> DelimiterQS<'a> {
     pub fn parse(slice: &'a [u8], delimiter: u8) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -190,9 +190,9 @@ impl<'a> SeparatorQueryString<'a> {
 mod de {
     use crate::de::__implementors::{IntoSizedIterator, ParsedSlice, RawSlice};
 
-    use super::SeparatorQueryString;
+    use super::DelimiterQS;
 
-    impl<'a> SeparatorQueryString<'a> {
+    impl<'a> DelimiterQS<'a> {
         pub(crate) fn into_iter(
             self,
         ) -> impl Iterator<Item = (ParsedSlice<'a>, SeparatorValues<'a>)> {
@@ -306,13 +306,13 @@ mod de {
 mod tests {
     use std::borrow::Cow;
 
-    use super::SeparatorQueryString;
+    use super::DelimiterQS;
 
     #[test]
     fn parse_pair() {
         let slice = b"key=value";
 
-        let parser = SeparatorQueryString::parse(slice, b'|');
+        let parser = DelimiterQS::parse(slice, b'|');
 
         assert_eq!(parser.keys(), vec![&Cow::Borrowed(b"key")]);
         assert_eq!(
@@ -331,7 +331,7 @@ mod tests {
     fn parse_multiple_pairs() {
         let slice = b"foo=bar&foobar=baz&qux=box";
 
-        let parser = SeparatorQueryString::parse(slice, b'|');
+        let parser = DelimiterQS::parse(slice, b'|');
 
         assert_eq!(
             parser.values(b"foo"),
@@ -351,7 +351,7 @@ mod tests {
     fn parse_no_value() {
         let slice = b"foo&foobar=";
 
-        let parser = SeparatorQueryString::parse(slice, b'|');
+        let parser = DelimiterQS::parse(slice, b'|');
 
         // Expecting a vector of values
         assert_eq!(parser.values(b"foo"), Some(None));
@@ -369,7 +369,7 @@ mod tests {
     fn parse_multiple_values() {
         let slice = b"foo=bar|baz|foobar||";
 
-        let parser = SeparatorQueryString::parse(slice, b'|');
+        let parser = DelimiterQS::parse(slice, b'|');
 
         assert_eq!(
             parser.values(b"foo"),
@@ -384,7 +384,7 @@ mod tests {
 
         let slice = b"foo=bar,baz,foobar,,";
 
-        let parser = SeparatorQueryString::parse(slice, b',');
+        let parser = DelimiterQS::parse(slice, b',');
 
         assert_eq!(
             parser.values(b"foo"),

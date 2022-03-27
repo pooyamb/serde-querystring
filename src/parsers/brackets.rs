@@ -148,11 +148,11 @@ impl<'a> Pair<'a> {
     }
 }
 
-pub struct BracketsQueryString<'a> {
+pub struct BracketsQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>>,
 }
 
-impl<'a> BracketsQueryString<'a> {
+impl<'a> BracketsQS<'a> {
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -202,7 +202,7 @@ impl<'a> BracketsQueryString<'a> {
         self.pairs.keys().collect()
     }
 
-    pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQueryString> {
+    pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQS> {
         Some(Self::from_pairs(self.pairs.get(key)?.iter().copied()))
     }
 
@@ -260,11 +260,11 @@ mod de {
         __implementors::{IntoDeserializer, ParsedSlice, RawSlice},
     };
 
-    use super::{BracketsQueryString, Pair};
+    use super::{BracketsQS, Pair};
 
     pub(crate) struct Pairs<'a>(Vec<Pair<'a>>);
 
-    impl<'a> BracketsQueryString<'a> {
+    impl<'a> BracketsQS<'a> {
         pub(crate) fn into_iter(self) -> impl Iterator<Item = (ParsedSlice<'a>, Pairs<'a>)> {
             self.pairs
                 .into_iter()
@@ -363,7 +363,7 @@ mod de {
             V: de::Visitor<'de>,
         {
             visitor.visit_map(PairsMapDeserializer {
-                iter: BracketsQueryString::from_pairs(self.0.into_iter()).into_iter(),
+                iter: BracketsQS::from_pairs(self.0.into_iter()).into_iter(),
                 scratch: self.1,
                 value: None,
             })
@@ -462,13 +462,13 @@ mod de {
 mod tests {
     use std::borrow::Cow;
 
-    use super::BracketsQueryString;
+    use super::BracketsQS;
 
     #[test]
     fn parse_pair() {
         let slice = b"key=value";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(parser.keys(), vec![&Cow::Borrowed(b"key")]);
         assert_eq!(
@@ -487,7 +487,7 @@ mod tests {
     fn parse_multiple_pairs() {
         let slice = b"foo=bar&foobar=baz&qux=box";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),
@@ -507,7 +507,7 @@ mod tests {
     fn parse_no_value() {
         let slice = b"foo&foobar=";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(parser.values(b"foo"), Some(vec![None]));
         assert_eq!(
@@ -520,7 +520,7 @@ mod tests {
     fn parse_multiple_values() {
         let slice = b"foo=bar&foo=baz&foo=foobar&foo&foo=";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),
@@ -540,7 +540,7 @@ mod tests {
     fn parse_subkeys() {
         let slice = b"foo[bar]=baz&foo[bar]=buzz&foo[foobar]=qux&foo=bar";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),
@@ -572,7 +572,7 @@ mod tests {
 
         let slice = b"foo[bar]xyz=baz&foo[bar][xyz=buzz&foo[foobar]xyz]=qux&foo[xyz=bar";
 
-        let parser = BracketsQueryString::parse(slice);
+        let parser = BracketsQS::parse(slice);
 
         assert_eq!(
             parser.values(b"foo"),
