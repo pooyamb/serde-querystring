@@ -160,7 +160,7 @@ impl<'a> DuplicateQS<'a> {
 #[cfg(feature = "serde")]
 mod de {
     use crate::de::{
-        Error,
+        Error, ErrorKind,
         __implementors::{IntoSizedIterator, ParsedSlice, RawSlice},
     };
 
@@ -201,7 +201,7 @@ mod de {
             if self.0.size_hint().0 == size {
                 Ok(self.0)
             } else {
-                Err(Error::Custom("()".to_string()))
+                Err(Error::new(ErrorKind::InvalidLength))
             }
         }
 

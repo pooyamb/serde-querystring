@@ -4,7 +4,7 @@ mod traits;
 
 use serde::{de, forward_to_deserialize_any};
 
-pub use error::Error;
+pub use error::{Error, ErrorKind};
 
 pub(crate) mod __implementors {
     pub use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
@@ -20,12 +20,7 @@ pub struct QSDeserializer<I, T> {
 }
 
 impl<I, T> QSDeserializer<I, T> {
-    pub fn new<'de, E, A>(iter: I) -> Self
-    where
-        I: Iterator<Item = (E, A)>,
-        for<'a> E: __implementors::IntoDeserializer<'de, 'a>,
-        for<'a> A: __implementors::IntoDeserializer<'de, 'a>,
-    {
+    pub fn new(iter: I) -> Self {
         Self {
             iter,
             value: None,

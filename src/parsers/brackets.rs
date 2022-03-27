@@ -256,7 +256,7 @@ mod de {
     use serde::{de, forward_to_deserialize_any};
 
     use crate::de::{
-        Error,
+        Error, ErrorKind,
         __implementors::{IntoDeserializer, ParsedSlice, RawSlice},
     };
 
@@ -311,8 +311,10 @@ mod de {
                 .map(|pair| {
                     let index = match pair.0.subkey() {
                         Some(subkey) if subkey.len() > 0 => {
-                            lexical::parse::<usize, _>(subkey.slice)
-                                .map_err(|e| Error::Custom(e.to_string()))?
+                            lexical::parse::<usize, _>(subkey.slice).map_err(|e| {
+                                Error::new(ErrorKind::InvalidNumber)
+                                    .message(format!("invalid index: {}", e))
+                            })?
                         }
                         _ => 0,
                     };

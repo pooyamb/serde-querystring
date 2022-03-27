@@ -7,7 +7,7 @@ use serde::{de, forward_to_deserialize_any};
 use crate::decode::{parse_bytes, Reference};
 
 use super::{
-    error::Error,
+    error::{Error, ErrorKind},
     slices::{OptionalRawSlice, ParsedSlice, RawSlice},
 };
 
@@ -17,6 +17,15 @@ pub trait IntoDeserializer<'de, 's> {
 
     /// Convert this value into a deserializer.
     fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer;
+}
+
+#[inline]
+fn invalid_boolean_error(slice: &[u8]) -> Error {
+    Error::new(ErrorKind::InvalidBoolean).slice(slice).message(
+        "invalid boolean {}, supported values are 1, on and true for true \
+        and 0, off and false for false"
+            .to_string(),
+    )
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +45,11 @@ impl<'de> ParsedSliceDeserializer<'de> {
     where
         T: FromLexical,
     {
-        lexical::parse(&self.0).map_err(|e| Error::Custom(e.to_string()))
+        lexical::parse(&self.0).map_err(|e| {
+            Error::new(ErrorKind::InvalidNumber)
+                .slice(&self.0)
+                .message(e.to_string())
+        })
     }
 
     fn parse_bool(&self) -> Result<bool, Error> {
@@ -45,13 +58,13 @@ impl<'de> ParsedSliceDeserializer<'de> {
             1 => match self.0[0] {
                 b'1' => Ok(true),
                 b'0' => Ok(false),
-                _ => Err(Error::Custom("(invalid bool)".to_string())),
+                _ => Err(invalid_boolean_error(&self.0)),
             },
             2 if self.0.as_ref() == b"on" => Ok(true),
             3 if self.0.as_ref() == b"off" => Ok(false),
             4 if self.0.as_ref() == b"true" => Ok(true),
             5 if self.0.as_ref() == b"false" => Ok(false),
-            _ => Err(Error::Custom("(invalid bool)".to_string())),
+            _ => Err(invalid_boolean_error(&self.0)),
         }
     }
 
@@ -65,12 +78,11 @@ impl<'de> ParsedSliceDeserializer<'de> {
                 .map_err(|e| (e.utf8_error(), Cow::Owned(e.into_bytes()))),
         };
 
-        res.map_err(|(error, _slice)| {
-            // Error::new(ErrorKind::InvalidEncoding)
-            //     .message("invalid utf-8 sequence found in the percent decoded value".to_string())
-            //     .value(&slice)
-            //     .index(error.valid_up_to())
-            Error::Custom(error.to_string())
+        res.map_err(|(error, slice)| {
+            Error::new(ErrorKind::InvalidEncoding)
+                .message("invalid utf-8 sequence found in the percent decoded value".to_string())
+                .slice(&slice)
+                .index(error.valid_up_to())
         })
     }
 }
@@ -230,7 +242,11 @@ impl<'de, 's> SliceDeserializer<'de, 's> {
     where
         T: FromLexical,
     {
-        lexical::parse(self.0).map_err(|e| Error::Custom(e.to_string()))
+        lexical::parse(self.0).map_err(|e| {
+            Error::new(ErrorKind::InvalidNumber)
+                .slice(self.0)
+                .message(e.to_string())
+        })
     }
 
     fn parse_bool(&self) -> Result<bool, Error> {
@@ -239,13 +255,13 @@ impl<'de, 's> SliceDeserializer<'de, 's> {
             1 => match self.0[0] {
                 b'1' => Ok(true),
                 b'0' => Ok(false),
-                _ => Err(Error::Custom("(invalid bool)".to_string())),
+                _ => Err(invalid_boolean_error(self.0)),
             },
             2 if self.0 == b"on" => Ok(true),
             3 if self.0 == b"off" => Ok(false),
             4 if self.0 == b"true" => Ok(true),
             5 if self.0 == b"false" => Ok(false),
-            _ => Err(Error::Custom("(invalid bool)".to_string())),
+            _ => Err(invalid_boolean_error(self.0)),
         }
     }
 
@@ -255,14 +271,12 @@ impl<'de, 's> SliceDeserializer<'de, 's> {
         parse_bytes(slice, self.1)
             .try_map(str::from_utf8)
             .map_err(|error| {
-                // Error::new(ErrorKind::InvalidEncoding)
-                //     .message(
-                //         "invalid utf-8 sequence found in the percent decoded value".to_string(),
-                //     )
-                //     .value(slice)
-                //     .index(error.valid_up_to())
-
-                Error::Custom(error.to_string())
+                Error::new(ErrorKind::InvalidEncoding)
+                    .message(
+                        "invalid utf-8 sequence found in the percent decoded value".to_string(),
+                    )
+                    .slice(slice)
+                    .index(error.valid_up_to())
             })
     }
 
@@ -635,7 +649,8 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::Custom(String::from("Tuple enums are not supported")))
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("Tuple enums are not supported")))
     }
 
     #[cold]
@@ -647,7 +662,8 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::Custom(String::from("Tuple enums are not supported")))
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("Struct enums are not supported")))
     }
 
     #[cold]
@@ -655,6 +671,7 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         T: de::DeserializeSeed<'de>,
     {
-        Err(Error::Custom(String::from("Tuple enums are not supported")))
+        Err(Error::new(ErrorKind::UnexpectedType)
+            .message(String::from("NewType enums are not supported")))
     }
 }
