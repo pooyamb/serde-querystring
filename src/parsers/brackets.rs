@@ -115,11 +115,6 @@ impl<'a> Value<'a> {
         parse_bytes(self.slice, scratch)
     }
 
-    pub fn decode(&self) -> Cow<'a, [u8]> {
-        let mut scratch = Vec::new();
-        self.decode_to(&mut scratch).into_cow()
-    }
-
     pub fn slice(&self) -> &'a [u8] {
         self.slice
     }
@@ -228,26 +223,6 @@ impl<'a> BracketsQS<'a> {
             .filter(|p| !p.0.has_subkey())
             .last()
             .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
-    }
-
-    pub fn raw_values(&self, key: &'a [u8]) -> Option<Vec<Option<&Value<'a>>>> {
-        Some(
-            self.pairs
-                .get(key)?
-                .iter()
-                .filter(|p| !p.0.has_subkey())
-                .map(|p| p.1.as_ref())
-                .collect(),
-        )
-    }
-
-    pub fn raw_value(&self, key: &'a [u8]) -> Option<Option<&Value<'a>>> {
-        self.pairs
-            .get(key)?
-            .iter()
-            .filter(|p| !p.0.has_subkey())
-            .last()
-            .map(|p| p.1.as_ref())
     }
 }
 

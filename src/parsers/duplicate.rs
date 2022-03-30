@@ -57,11 +57,6 @@ impl<'a> Value<'a> {
         parse_bytes(self.0, scratch)
     }
 
-    // pub fn decode(&self) -> Cow<'a, [u8]> {
-    //     let mut scratch = Vec::new();
-    //     self.decode_to(&mut scratch).into_cow()
-    // }
-
     pub fn slice(&self) -> &'a [u8] {
         self.0
     }
@@ -116,6 +111,9 @@ impl<'a> DuplicateQS<'a> {
         self.pairs.keys().collect()
     }
 
+    /// Returns a vector containing all the values assigned to a key
+    /// It will return None if the key didn't exist in the querystring
+    /// Vector may contain None the key had assignments without a value, ex `&key&`
     pub fn values(&self, key: &'a [u8]) -> Option<Vec<Option<Cow<'a, [u8]>>>> {
         let mut scratch = Vec::new();
 
@@ -128,6 +126,9 @@ impl<'a> DuplicateQS<'a> {
         )
     }
 
+    /// Returns the last value assigned to a key
+    /// It will return None if the key didn't exist in the querystring
+    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
 
@@ -136,24 +137,6 @@ impl<'a> DuplicateQS<'a> {
             .iter()
             .last()
             .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
-    }
-
-    pub fn raw_values(&self, key: &'a [u8]) -> Option<Vec<Option<&'a [u8]>>> {
-        Some(
-            self.pairs
-                .get(key)?
-                .iter()
-                .map(|p| p.1.as_ref().map(Value::slice))
-                .collect(),
-        )
-    }
-
-    pub fn raw_value(&self, key: &'a [u8]) -> Option<Option<&'a [u8]>> {
-        self.pairs
-            .get(key)?
-            .iter()
-            .last()
-            .map(|p| p.1.as_ref().map(Value::slice))
     }
 }
 
@@ -232,8 +215,6 @@ mod tests {
             parser.value(b"key"),
             Some(Some(Cow::Borrowed("value".as_bytes())))
         );
-
-        assert_eq!(parser.values(b"test"), None);
     }
 
     #[test]
@@ -262,11 +243,15 @@ mod tests {
 
         let parser = DuplicateQS::parse(slice);
 
+        assert_eq!(parser.value(b"key"), None);
+        assert_eq!(parser.values(b"key"), None);
+        assert_eq!(parser.value(b"foo"), Some(None));
         assert_eq!(parser.values(b"foo"), Some(vec![None]));
         assert_eq!(
             parser.values(b"foobar"),
             Some(vec![Some("".as_bytes().into())])
         );
+        assert_eq!(parser.value(b"foobar"), Some(Some("".as_bytes().into())));
     }
 
     #[test]

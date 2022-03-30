@@ -38,15 +38,6 @@ impl<'a> Value<'a> {
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.slice, scratch)
     }
-
-    pub fn decode(&self) -> Cow<'a, [u8]> {
-        let mut scratch = Vec::new();
-        self.decode_to(&mut scratch).into_cow()
-    }
-
-    pub fn slice(&self) -> &'a [u8] {
-        self.slice
-    }
 }
 
 #[derive(Default)]
@@ -85,15 +76,6 @@ impl<'a> Values<'a> {
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.slice, scratch)
-    }
-
-    pub fn decode(&self) -> Cow<'a, [u8]> {
-        let mut scratch = Vec::new();
-        self.decode_to(&mut scratch).into_cow()
-    }
-
-    pub fn slice(&self) -> &'a [u8] {
-        self.slice
     }
 }
 
@@ -147,6 +129,9 @@ impl<'a> DelimiterQS<'a> {
         self.pairs.keys().collect()
     }
 
+    /// Returns the values assigned to a key(only the last assignment) parsed using delimiter
+    /// It will return None if the key didn't exist in the querystring
+    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
     pub fn values(&self, key: &'a [u8]) -> Option<Option<Vec<Cow<'a, [u8]>>>> {
         let delimiter = self.delimiter;
         let mut scratch = Vec::new();
@@ -159,6 +144,9 @@ impl<'a> DelimiterQS<'a> {
         }))
     }
 
+    /// Returns the last value assigned to a key without taking delimiters into account
+    /// It will return None if the key didn't exist in the querystring
+    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
 
@@ -169,20 +157,6 @@ impl<'a> DelimiterQS<'a> {
                 .as_ref()
                 .map(|values| values.decode_to(&mut scratch).into_cow()),
         )
-    }
-
-    pub fn raw_values(&self, key: &'a [u8]) -> Option<Option<Vec<Value<'a>>>> {
-        Some(
-            self.pairs
-                .get(key)?
-                .1
-                .as_ref()
-                .map(|values| values.values(self.delimiter).collect()),
-        )
-    }
-
-    pub fn raw_value(&self, key: &'a [u8]) -> Option<Option<&Values<'a>>> {
-        Some(self.pairs.get(key)?.1.as_ref())
     }
 }
 

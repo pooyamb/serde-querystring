@@ -60,15 +60,6 @@ impl<'a> Value<'a> {
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.slice, scratch)
     }
-
-    pub fn decode(&self) -> Cow<'a, [u8]> {
-        let mut scratch = Vec::new();
-        self.decode_to(&mut scratch).into_cow()
-    }
-
-    pub fn slice(&self) -> &'a [u8] {
-        self.slice
-    }
 }
 
 pub struct Pair<'a>(Key<'a>, Option<Value<'a>>);
@@ -116,19 +107,19 @@ impl<'a> UrlEncodedQS<'a> {
         Self { pairs }
     }
 
+    /// Returns a vector containing all the keys in querystring
     pub fn keys(&self) -> Vec<&Cow<'a, [u8]>> {
         self.pairs.keys().collect()
     }
 
+    /// Returns the last value assigned to a key
+    /// It will return None if the key didn't exist in the querystring
+    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
         self.pairs
             .get(key)
             .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
-    }
-
-    pub fn raw_value(&self, key: &'a [u8]) -> Option<Option<&Value<'a>>> {
-        self.pairs.get(key).map(|p| p.1.as_ref())
     }
 }
 
@@ -166,8 +157,6 @@ mod tests {
             parser.value(b"key"),
             Some(Some(Cow::Borrowed("value".as_bytes())))
         );
-
-        assert_eq!(parser.value(b"test"), None);
     }
 
     #[test]
@@ -183,10 +172,12 @@ mod tests {
 
     #[test]
     fn parse_no_value() {
-        let slice = b"foo&foobar=";
+        let slice = b"foo&foobar=&foo2";
 
         let parser = UrlEncodedQS::parse(slice);
 
+        assert_eq!(parser.value(b"foo3"), None);
+        assert_eq!(parser.value(b"foo2"), Some(None));
         assert_eq!(parser.value(b"foo"), Some(None));
         assert_eq!(parser.value(b"foobar"), Some(Some("".as_bytes().into())));
     }
