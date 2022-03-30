@@ -1,14 +1,13 @@
-use std::borrow::Cow;
 use std::str;
 
 use lexical::{self, FromLexical};
 use serde::{de, forward_to_deserialize_any};
 
-use crate::decode::{parse_bytes, Reference};
+use crate::decode::Reference;
 
 use super::{
     error::{Error, ErrorKind},
-    slices::{OptionalRawSlice, ParsedSlice, RawSlice},
+    slices::{OptionalRawSlice, ParsedSlice, RawSlice, Value},
 };
 
 pub trait IntoDeserializer<'de, 's> {
@@ -19,271 +18,35 @@ pub trait IntoDeserializer<'de, 's> {
     fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer;
 }
 
-#[inline]
-fn invalid_boolean_error(slice: &[u8]) -> Error {
-    Error::new(ErrorKind::InvalidBoolean).slice(slice).message(
-        "invalid boolean {}, supported values are 1, on and true for true \
-        and 0, off and false for false"
-            .to_string(),
-    )
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'de, 's> IntoDeserializer<'de, 's> for ParsedSlice<'de> {
-    type Deserializer = ParsedSliceDeserializer<'de>;
+    type Deserializer = ValueDeserializer<'s, Self>;
 
-    fn into_deserializer(self, _: &mut Vec<u8>) -> Self::Deserializer {
-        ParsedSliceDeserializer(self.0)
+    fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer {
+        ValueDeserializer(self, scratch)
     }
 }
-
-pub struct ParsedSliceDeserializer<'de>(Cow<'de, [u8]>);
-
-impl<'de> ParsedSliceDeserializer<'de> {
-    fn parse_number<T>(&self) -> Result<T, Error>
-    where
-        T: FromLexical,
-    {
-        lexical::parse(&self.0).map_err(|e| {
-            Error::new(ErrorKind::InvalidNumber)
-                .slice(&self.0)
-                .message(e.to_string())
-        })
-    }
-
-    fn parse_bool(&self) -> Result<bool, Error> {
-        match self.0.len() {
-            0 => Ok(true),
-            1 => match self.0[0] {
-                b'1' => Ok(true),
-                b'0' => Ok(false),
-                _ => Err(invalid_boolean_error(&self.0)),
-            },
-            2 if self.0.as_ref() == b"on" => Ok(true),
-            3 if self.0.as_ref() == b"off" => Ok(false),
-            4 if self.0.as_ref() == b"true" => Ok(true),
-            5 if self.0.as_ref() == b"false" => Ok(false),
-            _ => Err(invalid_boolean_error(&self.0)),
-        }
-    }
-
-    fn parse_str(self) -> Result<Cow<'de, str>, Error> {
-        let res = match self.0 {
-            Cow::Borrowed(b) => str::from_utf8(b)
-                .map(Cow::Borrowed)
-                .map_err(|e| (e, Cow::Borrowed(b))),
-            Cow::Owned(o) => String::from_utf8(o)
-                .map(Cow::Owned)
-                .map_err(|e| (e.utf8_error(), Cow::Owned(e.into_bytes()))),
-        };
-
-        res.map_err(|(error, slice)| {
-            Error::new(ErrorKind::InvalidEncoding)
-                .message("invalid utf-8 sequence found in the percent decoded value".to_string())
-                .slice(&slice)
-                .index(error.valid_up_to())
-        })
-    }
-}
-
-macro_rules! deserialize_number {
-    ($($method:ident => $visit:ident) *) => {
-        $(
-            #[inline]
-            fn $method<V>(self, visitor: V) -> Result<V::Value,Error>
-            where
-                V: de::Visitor<'de>,
-            {
-                visitor.$visit(self.parse_number()?)
-            }
-        )*
-    };
-}
-
-impl<'de> de::Deserializer<'de> for ParsedSliceDeserializer<'de> {
-    type Error = Error;
-
-    #[inline]
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        match self.parse_str()? {
-            Cow::Borrowed(b) => visitor.visit_borrowed_str(b),
-            Cow::Owned(o) => visitor.visit_string(o),
-        }
-    }
-
-    #[inline]
-    fn deserialize_newtype_struct<V>(self, _: &str, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_newtype_struct(self)
-    }
-
-    #[inline]
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_bool(self.parse_bool()?)
-    }
-
-    #[inline]
-    fn deserialize_enum<V>(
-        self,
-        _: &'static str,
-        _: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_enum(self)
-    }
-
-    #[inline]
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        if self.0.is_empty() {
-            visitor.visit_none()
-        } else {
-            visitor.visit_some(self)
-        }
-    }
-
-    #[inline]
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_unit()
-    }
-
-    /// We don't check the bytes to be valid utf8
-    #[inline]
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        match self.0 {
-            Cow::Borrowed(b) => visitor.visit_borrowed_bytes(b),
-            Cow::Owned(o) => visitor.visit_byte_buf(o),
-        }
-    }
-
-    #[inline]
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.deserialize_bytes(visitor)
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.deserialize_bytes(visitor)
-    }
-
-    forward_to_deserialize_any! {
-        <W: Visitor<'de>>
-        char str string unit unit_struct map struct
-        tuple seq tuple_struct
-    }
-
-    deserialize_number!(
-        deserialize_i8 => visit_i8
-        deserialize_i16 => visit_i16
-        deserialize_i32 => visit_i32
-        deserialize_i64 => visit_i64
-
-        deserialize_u8 => visit_u8
-        deserialize_u16 => visit_u16
-        deserialize_u32 => visit_u32
-        deserialize_u64 => visit_u64
-
-        deserialize_f32 => visit_f32
-        deserialize_f64 => visit_f64
-    );
-}
-
-impl<'de> de::EnumAccess<'de> for ParsedSliceDeserializer<'de> {
-    type Error = Error;
-    type Variant = UnitOnly;
-
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(self).map(|res| (res, UnitOnly))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'de, 's> IntoDeserializer<'de, 's> for RawSlice<'de> {
-    type Deserializer = SliceDeserializer<'de, 's>;
+    type Deserializer = ValueDeserializer<'s, Self>;
 
     fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer {
-        SliceDeserializer(self.0, scratch)
+        ValueDeserializer(self, scratch)
     }
 }
 
-pub struct SliceDeserializer<'de, 's>(&'de [u8], &'s mut Vec<u8>);
+impl<'de, 's> IntoDeserializer<'de, 's> for OptionalRawSlice<'de> {
+    type Deserializer = ValueDeserializer<'s, Self>;
 
-impl<'de, 's> SliceDeserializer<'de, 's> {
-    fn parse_number<T>(&self) -> Result<T, Error>
-    where
-        T: FromLexical,
-    {
-        lexical::parse(self.0).map_err(|e| {
-            Error::new(ErrorKind::InvalidNumber)
-                .slice(self.0)
-                .message(e.to_string())
-        })
-    }
-
-    fn parse_bool(&self) -> Result<bool, Error> {
-        match self.0.len() {
-            0 => Ok(true),
-            1 => match self.0[0] {
-                b'1' => Ok(true),
-                b'0' => Ok(false),
-                _ => Err(invalid_boolean_error(self.0)),
-            },
-            2 if self.0 == b"on" => Ok(true),
-            3 if self.0 == b"off" => Ok(false),
-            4 if self.0 == b"true" => Ok(true),
-            5 if self.0 == b"false" => Ok(false),
-            _ => Err(invalid_boolean_error(self.0)),
-        }
-    }
-
-    fn parse_str(self) -> Result<Reference<'de, 's, str>, Error> {
-        let slice = self.0;
-
-        parse_bytes(slice, self.1)
-            .try_map(str::from_utf8)
-            .map_err(|error| {
-                Error::new(ErrorKind::InvalidEncoding)
-                    .message(
-                        "invalid utf-8 sequence found in the percent decoded value".to_string(),
-                    )
-                    .slice(slice)
-                    .index(error.valid_up_to())
-            })
-    }
-
-    fn parse_bytes(self) -> Reference<'de, 's, [u8]> {
-        parse_bytes(self.0, self.1)
+    fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer {
+        ValueDeserializer(self, scratch)
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ValueDeserializer<'s, T>(T, &'s mut Vec<u8>);
 
 macro_rules! deserialize_number {
     ($($method:ident => $visit:ident) *) => {
@@ -293,13 +56,16 @@ macro_rules! deserialize_number {
             where
                 V: de::Visitor<'de>,
             {
-                visitor.$visit(self.parse_number()?)
+                visitor.$visit(self.0.parse_number(self.1)?)
             }
         )*
     };
 }
 
-impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
+impl<'de, 's, T> de::Deserializer<'de> for ValueDeserializer<'s, T>
+where
+    T: Value<'de>,
+{
     type Error = Error;
 
     #[inline]
@@ -307,9 +73,10 @@ impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
     where
         V: de::Visitor<'de>,
     {
-        match self.parse_str()? {
+        match self.0.parse_str(self.1)? {
             Reference::Borrowed(b) => visitor.visit_borrowed_str(b),
             Reference::Copied(o) => visitor.visit_str(o),
+            Reference::Owned(o) => visitor.visit_string(o),
         }
     }
 
@@ -326,7 +93,7 @@ impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_bool(self.parse_bool()?)
+        visitor.visit_bool(self.0.parse_bool(self.1)?)
     }
 
     #[inline]
@@ -347,7 +114,7 @@ impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
     where
         V: de::Visitor<'de>,
     {
-        if self.0.is_empty() {
+        if self.0.is_none() {
             visitor.visit_none()
         } else {
             visitor.visit_some(self)
@@ -368,9 +135,10 @@ impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
     where
         V: de::Visitor<'de>,
     {
-        match self.parse_bytes() {
+        match self.0.parse_bytes(self.1) {
             Reference::Borrowed(b) => visitor.visit_borrowed_bytes(b),
             Reference::Copied(c) => visitor.visit_bytes(c),
+            Reference::Owned(o) => visitor.visit_byte_buf(o),
         }
     }
 
@@ -411,7 +179,10 @@ impl<'de, 's> de::Deserializer<'de> for SliceDeserializer<'de, 's> {
     );
 }
 
-impl<'de, 's> de::EnumAccess<'de> for SliceDeserializer<'de, 's> {
+impl<'de, 's, T> de::EnumAccess<'de> for ValueDeserializer<'s, T>
+where
+    T: Value<'de>,
+{
     type Error = Error;
     type Variant = UnitOnly;
 
@@ -420,19 +191,6 @@ impl<'de, 's> de::EnumAccess<'de> for SliceDeserializer<'de, 's> {
         V: de::DeserializeSeed<'de>,
     {
         seed.deserialize(self).map(|res| (res, UnitOnly))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<'de, 's> IntoDeserializer<'de, 's> for OptionalRawSlice<'de> {
-    type Deserializer = SliceDeserializer<'de, 's>;
-
-    fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer {
-        match self.0 {
-            Some(b) => SliceDeserializer(b, scratch),
-            None => SliceDeserializer(b"", scratch),
-        }
     }
 }
 
@@ -467,20 +225,43 @@ where
     where
         T: FromLexical,
     {
-        self.into_slice_deserializer().parse_number()
-    }
-
-    #[inline]
-    fn into_slice_deserializer(self) -> SliceDeserializer<'de, 's> {
-        SliceDeserializer(
+        RawSlice(
             self.0
                 .into_unsized_iterator()
                 .last()
                 .expect("Values iterator has no value inside it")
                 .0,
+        )
+        .parse_number(self.1)
+    }
+
+    #[inline]
+    fn into_slice_deserializer(self) -> ValueDeserializer<'s, RawSlice<'de>> {
+        ValueDeserializer(
+            RawSlice(
+                self.0
+                    .into_unsized_iterator()
+                    .last()
+                    .expect("Values iterator has no value inside it")
+                    .0,
+            ),
             self.1,
         )
     }
+}
+
+macro_rules! deserialize_number {
+    ($($method:ident => $visit:ident) *) => {
+        $(
+            #[inline]
+            fn $method<V>(self, visitor: V) -> Result<V::Value,Error>
+            where
+                V: de::Visitor<'de>,
+            {
+                visitor.$visit(self.parse_number()?)
+            }
+        )*
+    };
 }
 
 impl<'de, 's, I> de::Deserializer<'de> for IterDeserializer<'s, I>

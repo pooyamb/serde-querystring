@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 
 #[inline]
 pub fn parse_char(h: u8, l: u8) -> Option<u8> {
@@ -63,10 +63,11 @@ pub fn parse_bytes<'de, 's>(
 
 pub enum Reference<'b, 'c, T>
 where
-    T: ?Sized + 'static,
+    T: ?Sized + 'static + ToOwned,
 {
     Borrowed(&'b T),
     Copied(&'c T),
+    Owned(<T as ToOwned>::Owned),
 }
 
 impl<'b, 'c, T> Reference<'b, 'c, T>
@@ -77,24 +78,26 @@ where
         match self {
             Reference::Borrowed(b) => Cow::Borrowed(b),
             Reference::Copied(c) => Cow::Owned(c.to_owned()),
+            Reference::Owned(o) => Cow::Owned(o),
         }
     }
 
     pub fn try_map<F, B, E>(self, f: F) -> Result<Reference<'b, 'c, B>, E>
     where
         F: FnOnce(&T) -> Result<&B, E>,
-        B: ?Sized + 'static,
+        B: ?Sized + ToOwned + 'static,
     {
         match self {
             Reference::Borrowed(b) => f(b).map(Reference::Borrowed),
             Reference::Copied(c) => f(c).map(Reference::Copied),
+            Reference::Owned(o) => f(o.borrow()).map(|o| Reference::Owned(o.to_owned())),
         }
     }
 }
 
 impl<'b, 'c, T> std::ops::Deref for Reference<'b, 'c, T>
 where
-    T: ?Sized + 'static,
+    T: ?Sized + 'static + ToOwned,
 {
     type Target = T;
 
@@ -102,6 +105,7 @@ where
         match *self {
             Reference::Borrowed(b) => b,
             Reference::Copied(c) => c,
+            Reference::Owned(ref o) => o.borrow(),
         }
     }
 }
