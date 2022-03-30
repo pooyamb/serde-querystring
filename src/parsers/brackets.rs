@@ -282,6 +282,30 @@ mod de {
 
     pub struct PairsDeserializer<'a, 's>(Vec<Pair<'a>>, &'s mut Vec<u8>);
 
+    impl<'a, 's> PairsDeserializer<'a, 's> {
+        #[inline]
+        fn to_seq_values(&mut self) -> Result<Vec<(usize, RawSlice<'a>)>, Error> {
+            let mut values = std::mem::take(&mut self.0)
+                .into_iter()
+                .map(|pair| {
+                    let index = match pair.0.subkey() {
+                        Some(subkey) if subkey.len() > 0 => {
+                            lexical::parse::<usize, _>(subkey.slice).map_err(|e| {
+                                Error::new(ErrorKind::InvalidNumber)
+                                    .message(format!("invalid index: {}", e))
+                            })?
+                        }
+                        _ => 0,
+                    };
+                    Ok((index, RawSlice(pair.1.unwrap_or_default().slice())))
+                })
+                .collect::<Result<Vec<(usize, RawSlice)>, Error>>()?;
+
+            values.sort_by_key(|item| item.0);
+            Ok(values)
+        }
+    }
+
     macro_rules! forware_to_slice_deserializer {
         ($($method:ident ,)*) => {
             $(
@@ -301,52 +325,42 @@ mod de {
     impl<'de, 's> de::Deserializer<'de> for PairsDeserializer<'de, 's> {
         type Error = crate::de::Error;
 
-        fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
-            let mut values = self
-                .0
-                .into_iter()
-                .map(|pair| {
-                    let index = match pair.0.subkey() {
-                        Some(subkey) if subkey.len() > 0 => {
-                            lexical::parse::<usize, _>(subkey.slice).map_err(|e| {
-                                Error::new(ErrorKind::InvalidNumber)
-                                    .message(format!("invalid index: {}", e))
-                            })?
-                        }
-                        _ => 0,
-                    };
-                    Ok((index, RawSlice(pair.1.unwrap_or_default().slice())))
-                })
-                .collect::<Result<Vec<(usize, RawSlice)>, Error>>()?;
-
-            values.sort_by_key(|item| item.0);
-
             visitor.visit_seq(PairsSeqDeserializer(
-                values.into_iter().map(|v| v.1),
+                self.to_seq_values()?.into_iter().map(|v| v.1),
                 self.1,
             ))
         }
 
-        fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        fn deserialize_tuple<V>(mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
-            self.deserialize_seq(visitor)
+            let values = self.to_seq_values()?;
+
+            if values.len() == len {
+                visitor.visit_seq(PairsSeqDeserializer(
+                    values.into_iter().map(|v| v.1),
+                    self.1,
+                ))
+            } else {
+                Err(Error::new(ErrorKind::InvalidLength))
+            }
         }
 
         fn deserialize_tuple_struct<V>(
             self,
             _: &'static str,
-            _len: usize,
+            len: usize,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
-            self.deserialize_seq(visitor)
+            self.deserialize_tuple(len, visitor)
         }
 
         fn deserialize_newtype_struct<V>(
@@ -383,6 +397,22 @@ mod de {
             self.deserialize_map(visitor)
         }
 
+        fn deserialize_enum<V>(
+            self,
+            name: &'static str,
+            variants: &'static [&'static str],
+            visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: de::Visitor<'de>,
+        {
+            let scratch = self.1;
+            let value = self.0.last().unwrap().1.unwrap_or_default().slice();
+            RawSlice(value)
+                .into_deserializer(scratch)
+                .deserialize_enum(name, variants, visitor)
+        }
+
         forware_to_slice_deserializer! {
             deserialize_i8, deserialize_i16, deserialize_i32, deserialize_i64, deserialize_i128,
             deserialize_u8, deserialize_u16, deserialize_u32, deserialize_u64, deserialize_u128,
@@ -393,7 +423,7 @@ mod de {
         }
 
         forward_to_deserialize_any! {
-            unit_struct enum
+            unit_struct
         }
     }
 
