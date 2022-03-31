@@ -229,7 +229,7 @@ where
             self.0
                 .into_unsized_iterator()
                 .last()
-                .expect("Values iterator has no value inside it")
+                .expect("Values iterator can't be empty")
                 .0,
         )
         .parse_number(self.1)
@@ -242,7 +242,7 @@ where
                 self.0
                     .into_unsized_iterator()
                     .last()
-                    .expect("Values iterator has no value inside it")
+                    .expect("Values iterator can't be empty")
                     .0,
             ),
             self.1,

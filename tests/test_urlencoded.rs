@@ -1,7 +1,5 @@
 //! These tests are meant for the `UrlEncodedQS` method
 
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde_querystring::de::{from_bytes, Config};
 
@@ -27,8 +25,28 @@ macro_rules! p {
     };
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+struct UrlEncoded<'a> {
+    #[serde(borrow)]
+    foo: &'a str,
+    foobar: u32,
+    bar: Option<u32>,
+}
+
 #[test]
-fn deserialize_sequence() {
+fn deserialize_urlencoded() {
+    assert_eq!(
+        from_bytes(b"foo=bar&foobar=1337&foo=baz&bar=13", Config::UrlEncoded),
+        Ok(UrlEncoded {
+            foo: "baz",
+            foobar: 1337,
+            bar: Some(13)
+        })
+    )
+}
+
+#[test]
+fn deserialize_repeated_keys() {
     // vector
     assert_eq!(
         from_bytes(b"value=1&value=3&value=1337", Config::UrlEncoded),
@@ -36,37 +54,13 @@ fn deserialize_sequence() {
     );
 }
 
-/// Check if unit enums work as keys and values
 #[test]
-fn deserialize_unit_variants() {
-    #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-    enum Side {
-        Left,
-        Right,
-        God,
-    }
-
-    // unit enums as map keys
-    let mut map = HashMap::new();
-    map.insert(Side::God, "winner");
-    map.insert(Side::Right, "looser");
+fn deserialize_decoded_keys() {
+    // having different encoded kinds of the string `value` for key
+    // `v%61lu%65` `valu%65` `value`
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::UrlEncoded),
-        Ok(map)
-    );
-
-    // unit enums as map values
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct A {
-        looser: Side,
-        winner: Side,
-    }
-    assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::UrlEncoded),
-        Ok(A {
-            looser: Side::Left,
-            winner: Side::God
-        })
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::UrlEncoded),
+        Ok(p!(3))
     );
 }
 
@@ -92,14 +86,4 @@ fn deserialize_invalid_sequence() {
         Config::UrlEncoded
     )
     .is_err());
-}
-
-#[test]
-fn deserialize_decoded_keys() {
-    // having different encoded kinds of the string `value` for key
-    // `v%61lu%65` `valu%65` `value`
-    assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::UrlEncoded),
-        Ok(p!(3))
-    );
 }

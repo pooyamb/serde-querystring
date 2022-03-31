@@ -1,4 +1,4 @@
-//! These tests are meant for the `DelimiterQS` method
+//! These tests are meant for the `BracketsQS` method
 
 use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ macro_rules! p {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct Delimiter<'a> {
+struct Brackets<'a> {
     #[serde(borrow)]
     foo: &'a str,
     foobar: u32,
@@ -37,33 +37,18 @@ struct Delimiter<'a> {
 }
 
 #[test]
-fn deserialize_delimiter() {
+fn deserialize_brackets() {
     assert_eq!(
         from_bytes(
-            b"foo=bar&foobar=1337&foo=baz&bar=13&vec=1337|11",
-            Config::Delimiter(b'|')
+            b"foo=bar&foobar=1337&foo=baz&bar=13&vec[1]=1337&vec=11",
+            Config::Brackets
         ),
-        Ok(Delimiter {
+        Ok(Brackets {
             foo: "baz",
             foobar: 1337,
             bar: Some(13),
-            vec: vec![1337, 11]
+            vec: vec![11, 1337]
         })
-    )
-}
-
-#[test]
-fn deserialize_repeated_keys() {
-    // vector
-    assert_eq!(
-        from_bytes(b"value=1|2|3&value=4|5|6", Config::Delimiter(b'|')),
-        Ok(p!(vec![4, 5, 6]))
-    );
-
-    // vector
-    assert_eq!(
-        from_bytes(b"value=1337&value=7331", Config::Delimiter(b'|')),
-        Ok(p!(7331))
     );
 }
 
@@ -71,35 +56,53 @@ fn deserialize_repeated_keys() {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
-        Ok(p!(vec![1, 3, 1337]))
-    );
-    assert_eq!(
-        from_bytes(b"value=1,3,1337", Config::Delimiter(b',')),
+        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", Config::Brackets),
         Ok(p!(vec![1, 3, 1337]))
     );
 
     // array
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", Config::Brackets),
         Ok(p!([1, 3, 1337]))
     );
 
     // tuple
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", Config::Brackets),
         Ok(p!((1, 3, 1337)))
     );
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", Config::Brackets),
         Ok(p!((true, "3", 1337)))
     );
+}
 
-    // More values than expected, we will try to recover if possible
+#[test]
+fn deserialize_struct_value() {
+    // vector
     assert_eq!(
-        from_bytes(b"value=more|values|than|expected", Config::Delimiter(b'|')),
-        Ok(p!(("more", "values", "than|expected")))
+        from_bytes(
+            b"value[value][3]=1337&value[value][2]=3&value[value][1]=1",
+            Config::Brackets
+        ),
+        Ok(p!(p!(vec![1, 3, 1337])))
     );
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Sample2<'a> {
+        #[serde(borrow)]
+        foo: Primitive<&'a str>,
+        #[serde(borrow)]
+        qux: Primitive<&'a str>,
+    }
+
+    assert_eq!(
+        from_bytes(b"foo[value]=bar&qux[value]=foobar", Config::Brackets),
+        Ok(Sample2 {
+            foo: p!("bar"),
+            qux: p!("foobar")
+        })
+    )
 }
 
 /// Check if unit enums work as keys and values
@@ -117,7 +120,7 @@ fn deserialize_unit_enums() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Delimiter(b'|')),
+        from_bytes(b"God=winner&Right=looser", Config::Brackets),
         Ok(map)
     );
 
@@ -128,7 +131,7 @@ fn deserialize_unit_enums() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Delimiter(b'|')),
+        from_bytes::<A>(b"looser=Left&winner=God", Config::Brackets),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -143,7 +146,7 @@ fn deserialize_unit_enums() {
 
     // unit enums in sequence
     assert_eq!(
-        from_bytes(b"value=God|Left|Right", Config::Delimiter(b'|')),
+        from_bytes(b"value=God&value=Left&value=Right", Config::Brackets),
         Ok(VecEnum {
             value: vec![Side::God, Side::Left, Side::Right]
         })
@@ -153,22 +156,33 @@ fn deserialize_unit_enums() {
 #[test]
 fn deserialize_invalid_sequence() {
     // array length
-    assert!(
-        from_bytes::<Primitive<[usize; 3]>>(b"value=1|3|1337|999", Config::Delimiter(b'|'))
-            .is_err()
-    );
+    assert!(from_bytes::<Primitive<[usize; 3]>>(
+        b"value=1&value=3&value=1337&value=999",
+        Config::Brackets
+    )
+    .is_err());
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
-        b"1|3|1337|999",
-        Config::Delimiter(b'|')
+        b"value=1&value=3&value=1337&value=999",
+        Config::Brackets
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
-        b"value=foo|bar|baz",
-        Config::Delimiter(b'|')
+        b"value=foo&value=bar&value=baz",
+        Config::Brackets
     )
     .is_err());
+}
+
+#[test]
+fn deserialize_decoded_keys() {
+    // having different encoded kinds of the string `value` for key
+    // `v%61lu%65` `valu%65` `value`
+    assert_eq!(
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Brackets),
+        Ok(p!(vec!["1", "2", "3"]))
+    );
 }

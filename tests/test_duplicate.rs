@@ -1,7 +1,5 @@
 //! These tests are meant for the `DuplicateQS` method
 
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde_querystring::de::{from_bytes, Config};
 
@@ -27,6 +25,45 @@ macro_rules! p {
     };
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+struct Duplicate<'a> {
+    #[serde(borrow)]
+    foo: &'a str,
+    foobar: u32,
+    bar: Option<u32>,
+    vec: Vec<u32>,
+}
+
+#[test]
+fn deserialize_duplicate() {
+    assert_eq!(
+        from_bytes(
+            b"foo=bar&foobar=1337&foo=baz&bar=13&vec=1337&vec=11",
+            Config::Duplicate
+        ),
+        Ok(Duplicate {
+            foo: "baz",
+            foobar: 1337,
+            bar: Some(13),
+            vec: vec![1337, 11]
+        })
+    )
+}
+
+#[test]
+fn deserialize_value() {
+    // vector
+    assert_eq!(
+        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        Ok(p!(1337))
+    );
+
+    assert_eq!(
+        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        Ok(p!("1337"))
+    );
+}
+
 #[test]
 fn deserialize_sequence() {
     // vector
@@ -50,11 +87,7 @@ fn deserialize_sequence() {
         from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
         Ok(p!((true, "3", 1337)))
     );
-}
 
-/// Check if unit enums work as keys and values
-#[test]
-fn deserialize_unit_variants() {
     #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
     enum Side {
         Left,
@@ -62,41 +95,20 @@ fn deserialize_unit_variants() {
         God,
     }
 
-    // unit enums as map keys
-    let mut map = HashMap::new();
-    map.insert(Side::God, "winner");
-    map.insert(Side::Right, "looser");
-    assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Duplicate),
-        Ok(map)
-    );
-
-    // unit enums as map values
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct A {
-        looser: Side,
-        winner: Side,
-    }
-    assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Duplicate),
-        Ok(A {
-            looser: Side::Left,
-            winner: Side::God
-        })
-    );
-
-    // unit enums as map values
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct VecEnum {
-        value: Vec<Side>,
-    }
-
     // unit enums in sequence
     assert_eq!(
         from_bytes(b"value=God&value=Left&value=Right", Config::Duplicate),
-        Ok(VecEnum {
-            value: vec![Side::God, Side::Left, Side::Right]
-        })
+        Ok(p!(vec![Side::God, Side::Left, Side::Right]))
+    );
+}
+
+#[test]
+fn deserialize_decoded_keys() {
+    // having different encoded kinds of the string `value` for key
+    // `v%61lu%65` `valu%65` `value`
+    assert_eq!(
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Duplicate),
+        Ok(p!(vec!["1", "2", "3"]))
     );
 }
 
@@ -122,14 +134,4 @@ fn deserialize_invalid_sequence() {
         Config::Duplicate
     )
     .is_err());
-}
-
-#[test]
-fn deserialize_decoded_keys() {
-    // having different encoded kinds of the string `value` for key
-    // `v%61lu%65` `valu%65` `value`
-    assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Duplicate),
-        Ok(p!(vec!["1", "2", "3"]))
-    );
 }

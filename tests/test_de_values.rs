@@ -1,7 +1,9 @@
 //! These tests are common between different deserialization methods
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config, Error};
+use serde_querystring::de::{from_bytes, Config, Error, ErrorKind};
 
 fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
     from_bytes(input.as_bytes(), Config::UrlEncoded)
@@ -27,6 +29,13 @@ macro_rules! p {
     ($value:expr) => {
         Primitive::new($value)
     };
+}
+
+#[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
+enum Side {
+    Left,
+    Right,
+    God,
 }
 
 #[test]
@@ -62,6 +71,20 @@ fn deserialize_integer_valid() {
     // i64
     assert_eq!(from_str("value=9223372036854775807"), Ok(p!(i64::MAX)));
     assert_eq!(from_str("value=-9223372036854775808"), Ok(p!(i64::MIN)));
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(-1337_i64, "value1");
+    map.insert(-7331_i64, "value2");
+    map.insert(1337_i64, "value3");
+    map.insert(7331_i64, "value4");
+    assert_eq!(
+        from_bytes(
+            b"-1337=value1&-7331=value2&1337=value3&7331=value4",
+            Config::UrlEncoded
+        ),
+        Ok(map)
+    );
 }
 
 #[test]
@@ -94,6 +117,15 @@ fn deserialize_bool() {
     assert_eq!(from_str("value=0"), Ok(p!(false)));
     assert_eq!(from_str("value=off"), Ok(p!(false)));
     assert_eq!(from_str("value=false"), Ok(p!(false)));
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(true, "value1");
+    map.insert(false, "value2");
+    assert_eq!(
+        from_bytes(b"true=value1&off=value2", Config::UrlEncoded),
+        Ok(map)
+    );
 }
 
 /// Check if we can directly deserialize non percent encoded values to str
@@ -104,6 +136,15 @@ fn deserialize_str() {
     // We don't make assumptions about numbers
     assert_eq!(from_str("value=250"), Ok(p!("250")));
     assert_eq!(from_str("value=-25"), Ok(p!("-25")));
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert("some", "value1");
+    map.insert("bytes", "value2");
+    assert_eq!(
+        from_bytes(b"some=value1&bytes=value2", Config::UrlEncoded),
+        Ok(map)
+    );
 }
 
 #[test]
@@ -118,6 +159,98 @@ fn deserialize_strings() {
 
     // Plus in strings should be replaced with space
     assert_eq!(from_str("value=rum+rum"), Ok(p!("rum rum".to_string())));
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(String::from("some"), "value1");
+    map.insert(String::from("st ri ng"), "value2");
+    assert_eq!(
+        from_bytes(b"some=value1&st+ri+ng=value2", Config::UrlEncoded),
+        Ok(map)
+    );
+}
+
+#[test]
+fn deserialize_bytes() {
+    assert_eq!(
+        from_str("value=test"),
+        Ok(p!(serde_bytes::Bytes::new(b"test")))
+    );
+
+    // We don't make assumptions about numbers
+    assert_eq!(
+        from_str("value=250"),
+        Ok(p!(serde_bytes::Bytes::new(b"250")))
+    );
+    assert_eq!(
+        from_str("value=-25"),
+        Ok(p!(serde_bytes::Bytes::new(b"-25")))
+    );
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(serde_bytes::Bytes::new(b"some"), "value1");
+    map.insert(serde_bytes::Bytes::new(b"bytes"), "value2");
+    assert_eq!(
+        from_bytes(b"some=value1&bytes=value2", Config::UrlEncoded),
+        Ok(map)
+    );
+}
+
+#[test]
+fn deserialize_byte_vecs() {
+    assert_eq!(
+        from_str("value=foo"),
+        Ok(p!(serde_bytes::ByteBuf::from("foo")))
+    );
+
+    // percent decoded
+    assert_eq!(
+        from_str("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
+        Ok(p!(serde_bytes::ByteBuf::from("بابابزرگ")))
+    );
+
+    // Plus in strings should be replaced with space
+    assert_eq!(
+        from_str("value=rum+rum"),
+        Ok(p!(serde_bytes::ByteBuf::from("rum rum")))
+    );
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(serde_bytes::ByteBuf::from("some"), "value1");
+    map.insert(serde_bytes::ByteBuf::from("by\0te s"), "value2");
+    assert_eq!(
+        from_bytes(b"some=value1&by%00te+s=value2", Config::UrlEncoded),
+        Ok(map)
+    );
+}
+
+/// Check if unit enums work as keys and values
+#[test]
+fn deserialize_unit_enum() {
+    // unit enums as map values
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct A {
+        looser: Side,
+        winner: Side,
+    }
+    assert_eq!(
+        from_bytes::<A>(b"looser=Left&winner=God", Config::UrlEncoded),
+        Ok(A {
+            looser: Side::Left,
+            winner: Side::God
+        })
+    );
+
+    // In keys
+    let mut map = HashMap::new();
+    map.insert(Side::God, "winner");
+    map.insert(Side::Right, "looser");
+    assert_eq!(
+        from_bytes(b"God=winner&Right=looser", Config::UrlEncoded),
+        Ok(map)
+    );
 }
 
 #[test]
@@ -208,6 +341,7 @@ fn deserialize_invalid_number() {
     assert!(from_str::<Primitive<f64>>("value=-1.5num").is_err());
     assert!(from_str::<Primitive<f64>>("value=&").is_err());
     assert!(from_str::<Primitive<f64>>("value=1.0a1.0").is_err());
+    assert!(from_str::<Primitive<f64>>("value=%2222").is_err());
 }
 
 /// Check if different boolean idents work
@@ -217,6 +351,7 @@ fn deserialize_invalid_bool() {
     assert!(from_str::<Primitive<bool>>("value=0off").is_err());
     assert!(from_str::<Primitive<bool>>("value=of").is_err());
     assert!(from_str::<Primitive<bool>>("value=onoff").is_err());
+    assert!(from_str::<Primitive<bool>>("value=on%25").is_err());
 }
 
 #[test]
@@ -238,67 +373,61 @@ fn deserialize_invalid_type() {
 
 #[test]
 fn deserialize_invalid_precent_decoding() {
+    // If the there is a percent but there aren't 2 characters after it, we ignore them
+    assert_eq!(from_str("value=Test%8"), Ok(p!("Test%8")));
+
+    // If the there is a percent but the next 2 characters aren't hex numbers, we ignore them
+    assert_eq!(from_str("value=Test%as"), Ok(p!("Test%as")));
+
+    // If we ignored a percent, we may accept the next percent encoded characters within the first one's bound
+    assert_eq!(from_str("value=Test%%25"), Ok(p!("Test%%".to_string())));
+
+    // If the provided char is invalid, we throw error
     assert!(from_str::<Primitive<String>>("value=Test%88").is_err());
 }
 
-// #[test]
-// fn deserialize_error_test() {
-//     assert_eq!(
-//         from_str::<Primitive<(i32, i32)>>("value=12&value=13&value=14")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::InvalidLength
-//     );
+#[test]
+fn deserialize_error_test() {
+    assert_eq!(
+        from_str::<Primitive<String>>("value=Test%88%88")
+            .unwrap_err()
+            .kind,
+        ErrorKind::InvalidEncoding
+    );
 
-//     #[derive(Debug, Deserialize)]
-//     struct Tuple(i32, i32);
-//     assert_eq!(
-//         from_str::<Primitive<Tuple>>("value=12&value=13&value=14")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::InvalidLength
-//     );
+    assert_eq!(
+        from_str::<Primitive<i32>>("value=12foo").unwrap_err().kind,
+        ErrorKind::InvalidNumber
+    );
 
-//     assert_eq!(
-//         from_str::<Primitive<String>>("value=Test%88%88")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::InvalidEncoding
-//     );
+    assert_eq!(
+        from_str::<Primitive<bool>>("value=foo").unwrap_err().kind,
+        ErrorKind::InvalidBoolean
+    );
 
-//     assert_eq!(
-//         from_str::<Primitive<i32>>("value=12foo").unwrap_err().kind,
-//         ErrorKind::InvalidNumber
-//     );
+    #[derive(Debug, Deserialize)]
+    enum ValueEnum {
+        A(i32, i32),
+        B(i32),
+        C {},
+    }
 
-//     assert_eq!(
-//         from_str::<Primitive<bool>>("value=foo").unwrap_err().kind,
-//         ErrorKind::InvalidBoolean
-//     );
-
-//     #[derive(Debug, Deserialize)]
-//     enum ValueEnum {
-//         A(i32, i32),
-//         B(i32),
-//         C {},
-//     }
-
-//     assert_eq!(
-//         from_str::<Primitive<ValueEnum>>("value=A")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::UnexpectedType
-//     );
-//     assert_eq!(
-//         from_str::<Primitive<ValueEnum>>("value=B")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::UnexpectedType
-//     );
-//     assert_eq!(
-//         from_str::<Primitive<ValueEnum>>("value=C")
-//             .unwrap_err()
-//             .kind,
-//         ErrorKind::UnexpectedType
-//     );
-// }
+    assert_eq!(
+        from_str::<Primitive<ValueEnum>>("value=A")
+            .unwrap_err()
+            .kind,
+        ErrorKind::UnexpectedType
+    );
+    assert_eq!(
+        from_str::<Primitive<ValueEnum>>("value=B")
+            .unwrap_err()
+            .kind,
+        ErrorKind::UnexpectedType
+    );
+    assert_eq!(
+        from_str::<Primitive<ValueEnum>>("value=C")
+            .unwrap_err()
+            .kind,
+        ErrorKind::UnexpectedType
+    );
+}
