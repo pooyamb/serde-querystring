@@ -228,7 +228,7 @@ impl<'a> BracketsQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use serde::{de, forward_to_deserialize_any};
+    use serde::{de, forward_to_deserialize_any, Deserializer};
 
     use crate::de::{
         Error, ErrorKind,
@@ -374,18 +374,14 @@ mod de {
 
         fn deserialize_enum<V>(
             self,
-            name: &'static str,
-            variants: &'static [&'static str],
+            _: &'static str,
+            _: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
-            let scratch = self.1;
-            let value = self.0.last().unwrap().1.unwrap_or_default().slice();
-            RawSlice(value)
-                .into_deserializer(scratch)
-                .deserialize_enum(name, variants, visitor)
+            visitor.visit_enum(self)
         }
 
         forware_to_slice_deserializer! {
@@ -399,6 +395,77 @@ mod de {
 
         forward_to_deserialize_any! {
             unit_struct
+        }
+    }
+
+    impl<'de, 's> de::EnumAccess<'de> for PairsDeserializer<'de, 's> {
+        type Error = Error;
+
+        type Variant = Self;
+
+        fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+        where
+            V: de::DeserializeSeed<'de>,
+        {
+            let last_pair = self.0.last().expect("Values iterator can't be empty");
+            match last_pair.0.subkey() {
+                Some(subkey) => {
+                    println!("{}", unsafe { std::str::from_utf8_unchecked(subkey.slice) });
+                    let mut scratch = self.1;
+                    let pairs = BracketsQS::from_pairs(self.0.into_iter())
+                        .pairs
+                        .remove(subkey.slice)
+                        .unwrap();
+                    seed.deserialize(RawSlice(subkey.slice).into_deserializer(&mut scratch))
+                        .map(move |v| (v, Self(pairs, scratch)))
+                }
+                None => {
+                    let mut scratch = self.1;
+                    seed.deserialize(
+                        RawSlice(last_pair.1.unwrap_or_default().slice)
+                            .into_deserializer(&mut scratch),
+                    )
+                    .map(move |v| (v, PairsDeserializer(Vec::new(), scratch)))
+                }
+            }
+        }
+    }
+
+    impl<'de, 's> de::VariantAccess<'de> for PairsDeserializer<'de, 's> {
+        type Error = Error;
+
+        fn unit_variant(self) -> Result<(), Self::Error> {
+            if self.0.len() == 0 {
+                Ok(())
+            } else {
+                Err(Error::new(ErrorKind::Other)
+                    .message("Unit enum variants should not have values".to_string()))
+            }
+        }
+
+        fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+        where
+            T: de::DeserializeSeed<'de>,
+        {
+            seed.deserialize(self)
+        }
+
+        fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: de::Visitor<'de>,
+        {
+            self.deserialize_tuple(len, visitor)
+        }
+
+        fn struct_variant<V>(
+            self,
+            fields: &'static [&'static str],
+            visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: de::Visitor<'de>,
+        {
+            self.deserialize_struct("name", fields, visitor)
         }
     }
 

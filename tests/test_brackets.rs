@@ -152,6 +152,66 @@ fn deserialize_unit_enums() {
         })
     );
 }
+/// Check if unit enums work as keys and values
+#[test]
+fn deserialize_enums() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    enum Enum {
+        Unit,
+        NewType(i32),
+        Tuple(i32, i32),
+        Struct { bee: i32, loose: i32 },
+    }
+
+    assert_eq!(
+        from_bytes(b"value=Unit", Config::Brackets),
+        Ok(p!(Enum::Unit))
+    );
+    assert_eq!(
+        from_bytes(b"value[NewType]=2022", Config::Brackets),
+        Ok(p!(Enum::NewType(2022)))
+    );
+    assert_eq!(
+        from_bytes(b"value[Tuple][0]=100&value[Tuple][1]=200", Config::Brackets),
+        Ok(p!(Enum::Tuple(100, 200)))
+    );
+    assert_eq!(
+        from_bytes(
+            b"value[Struct][bee]=833&value[Struct][loose]=10053",
+            Config::Brackets
+        ),
+        Ok(p!(Enum::Struct {
+            bee: 833,
+            loose: 10053
+        }))
+    );
+
+    // Assigning a key again should override its value
+    assert_eq!(
+        from_bytes(
+            b"value[Struct][bee]=833&value[Struct][loose]=10053&value[NewType]=100",
+            Config::Brackets
+        ),
+        Ok(p!(Enum::NewType(100)))
+    );
+    assert_eq!(
+        from_bytes(
+            b"value[Struct][bee]=833&value[NewType]=100&value[Struct][loose]=10053",
+            Config::Brackets
+        ),
+        Ok(p!(Enum::Struct {
+            bee: 833,
+            loose: 10053
+        }))
+    );
+    assert_eq!(
+        from_bytes(
+            b"value[Struct][bee]=833&value[NewType]=100&value[Struct][loose]=10053&value=Unit",
+            Config::Brackets
+        ),
+        Ok(p!(Enum::Unit))
+    );
+}
 
 #[test]
 fn deserialize_invalid_sequence() {
