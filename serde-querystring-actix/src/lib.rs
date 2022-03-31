@@ -10,6 +10,8 @@ use actix_web::{Error, FromRequest, HttpRequest, ResponseError};
 use derive_more::{Display, From};
 use serde::de;
 
+pub use serde_querystring::de::ParseMode;
+
 /// Actix-web's web::Query modified to work with serde-querystring
 ///
 /// [**QueryStringConfig**](struct.QueryStringConfig.html) allows to configure extraction process.
@@ -46,7 +48,7 @@ use serde::de;
 ///        web::resource("/index.html").route(web::get().to(index))); // <- use `Query` extractor
 /// }
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct QueryString<T>(pub T);
 
 impl<T> QueryString<T> {
@@ -56,13 +58,16 @@ impl<T> QueryString<T> {
     }
 
     /// Get query parameters from the path
-    pub fn from_query(query_str: &str) -> Result<Self, QueryStringPayloadError>
+    pub fn from_query(
+        query_str: &str,
+        parse_mode: serde_querystring::de::ParseMode,
+    ) -> Result<Self, QueryStringPayloadError>
     where
         T: de::DeserializeOwned,
     {
-        serde_querystring::from_str::<T>(query_str)
-            .map(|val| Ok(QueryString(val)))
-            .unwrap_or_else(move |e| Err(QueryStringPayloadError::Deserialize(e)))
+        serde_querystring::de::from_str::<T>(query_str, parse_mode)
+            .map(Self)
+            .map_err(QueryStringPayloadError::Deserialize)
     }
 }
 
@@ -77,12 +82,6 @@ impl<T> ops::Deref for QueryString<T> {
 impl<T> ops::DerefMut for QueryString<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.0
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for QueryString<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -133,16 +132,15 @@ where
 {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
-    type Config = QueryStringConfig;
 
     #[inline]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let error_handler = req
-            .app_data::<Self::Config>()
-            .map(|c| c.ehandler.clone())
-            .unwrap_or(None);
+        let config = req
+            .app_data::<QueryStringConfig>()
+            .cloned()
+            .unwrap_or_default();
 
-        serde_querystring::from_str::<T>(req.query_string())
+        serde_querystring::de::from_str::<T>(req.query_string(), config.mode)
             .map(|val| ready(Ok(QueryString(val))))
             .unwrap_or_else(move |e| {
                 let e = QueryStringPayloadError::Deserialize(e);
@@ -153,7 +151,7 @@ where
                     req.path()
                 );
 
-                let e = if let Some(error_handler) = error_handler {
+                let e = if let Some(error_handler) = config.ehandler {
                     (error_handler)(e, req)
                 } else {
                     e.into()
@@ -171,7 +169,7 @@ where
 /// ```rust
 /// use actix_web::{error, web, App, FromRequest, HttpResponse};
 /// use serde::Deserialize;
-/// use serde_querystring_actix::{QueryString, QueryStringConfig};
+/// use serde_querystring_actix::{QueryString, QueryStringConfig, ParseMode};
 ///
 /// #[derive(Deserialize)]
 /// struct Info {
@@ -188,6 +186,7 @@ where
 ///         web::resource("/index.html").app_data(
 ///             // change query extractor configuration
 ///             QueryStringConfig::default()
+///                 .parse_mode(ParseMode::Brackets) // <- choose the parsing mode
 ///                 .error_handler(|err, req| {  // <- create custom error response
 ///                     error::InternalError::from_response(
 ///                         err, HttpResponse::Conflict().finish()).into()
@@ -199,6 +198,7 @@ where
 /// ```
 #[derive(Clone)]
 pub struct QueryStringConfig {
+    mode: serde_querystring::de::ParseMode,
     ehandler: Option<Arc<dyn Fn(QueryStringPayloadError, &HttpRequest) -> Error + Send + Sync>>,
 }
 
@@ -211,11 +211,19 @@ impl QueryStringConfig {
         self.ehandler = Some(Arc::new(f));
         self
     }
+
+    pub fn parse_mode(mut self, mode: serde_querystring::de::ParseMode) -> Self {
+        self.mode = mode;
+        self
+    }
 }
 
 impl Default for QueryStringConfig {
     fn default() -> Self {
-        QueryStringConfig { ehandler: None }
+        QueryStringConfig {
+            mode: serde_querystring::de::ParseMode::Duplicate,
+            ehandler: None,
+        }
     }
 }
 
@@ -224,7 +232,7 @@ impl Default for QueryStringConfig {
 pub enum QueryStringPayloadError {
     /// Deserialize error
     #[display(fmt = "Query deserialize error: {}", _0)]
-    Deserialize(serde_querystring::Error),
+    Deserialize(serde_querystring::de::Error),
 }
 
 impl std::error::Error for QueryStringPayloadError {}
@@ -255,13 +263,24 @@ mod tests {
     #[actix_rt::test]
     async fn test_service_request_extract() {
         let req = TestRequest::with_uri("/name/user1/").to_srv_request();
-        assert!(QueryString::<Id>::from_query(&req.query_string()).is_err());
+        assert!(QueryString::<Id>::from_query(
+            &req.query_string(),
+            serde_querystring::de::ParseMode::UrlEncoded
+        )
+        .is_err());
 
         let req = TestRequest::with_uri("/name/user1/?id=test").to_srv_request();
-        let mut s = QueryString::<Id>::from_query(&req.query_string()).unwrap();
+        let mut s = QueryString::<Id>::from_query(
+            &req.query_string(),
+            serde_querystring::de::ParseMode::UrlEncoded,
+        )
+        .unwrap();
 
         assert_eq!(s.id, "test");
-        assert_eq!(format!("{}, {:?}", s, s), "test, Id { id: \"test\" }");
+        assert_eq!(
+            format!("{}, {:?}", s, s),
+            "test, QueryString(Id { id: \"test\" })"
+        );
 
         s.id = "test1".to_string();
         let s = s.into_inner();
@@ -283,7 +302,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(s.id, "test");
-        assert_eq!(format!("{}, {:?}", s, s), "test, Id { id: \"test\" }");
+        assert_eq!(
+            format!("{}, {:?}", s, s),
+            "test, QueryString(Id { id: \"test\" })"
+        );
 
         s.id = "test1".to_string();
         let s = s.into_inner();
