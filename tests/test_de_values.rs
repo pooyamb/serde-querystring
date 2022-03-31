@@ -404,30 +404,4 @@ fn deserialize_error_test() {
         from_str::<Primitive<bool>>("value=foo").unwrap_err().kind,
         ErrorKind::InvalidBoolean
     );
-
-    #[derive(Debug, Deserialize)]
-    enum ValueEnum {
-        A(i32, i32),
-        B(i32),
-        C {},
-    }
-
-    assert_eq!(
-        from_str::<Primitive<ValueEnum>>("value=A")
-            .unwrap_err()
-            .kind,
-        ErrorKind::UnexpectedType
-    );
-    assert_eq!(
-        from_str::<Primitive<ValueEnum>>("value=B")
-            .unwrap_err()
-            .kind,
-        ErrorKind::UnexpectedType
-    );
-    assert_eq!(
-        from_str::<Primitive<ValueEnum>>("value=C")
-            .unwrap_err()
-            .kind,
-        ErrorKind::UnexpectedType
-    );
 }

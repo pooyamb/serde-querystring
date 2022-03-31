@@ -2,7 +2,7 @@ use std::fmt;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ErrorKind {
-    UnexpectedType,
+    InvalidType,
     InvalidLength,
     InvalidEncoding,
     InvalidNumber,
@@ -16,9 +16,8 @@ pub struct Error {
     pub message: String,
 
     // The slice causing the error
-    pub slice: String,
-
-    // The index of first problematic byte in the slice
+    pub value: String,
+    // Index of the byte in the value slice, causing the error
     pub index: Option<usize>,
 }
 
@@ -27,7 +26,7 @@ impl Error {
         Error {
             kind,
             message: String::new(),
-            slice: String::new(),
+            value: String::new(),
             index: None,
         }
     }
@@ -37,8 +36,8 @@ impl Error {
         self
     }
 
-    pub(crate) fn slice(mut self, value: &[u8]) -> Self {
-        self.slice = String::from_utf8_lossy(value).to_string();
+    pub(crate) fn value(mut self, slice: &[u8]) -> Self {
+        self.value = String::from_utf8_lossy(slice).to_string();
         self
     }
 
@@ -55,6 +54,11 @@ impl serde::de::Error for Error {
     {
         Error::new(ErrorKind::Other).message(msg.to_string())
     }
+
+    fn invalid_type(unexp: serde::de::Unexpected, exp: &dyn serde::de::Expected) -> Self {
+        Error::new(ErrorKind::InvalidType)
+            .message(format_args!("invalid type: {}, expected {}", unexp, exp).to_string())
+    }
 }
 
 impl std::error::Error for Error {}
@@ -63,7 +67,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
             "Error {:?}: {} in `{}`",
-            self.kind, self.message, self.slice
+            self.kind, self.message, self.value
         ))
     }
 }

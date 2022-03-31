@@ -430,7 +430,7 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::new(ErrorKind::UnexpectedType)
+        Err(Error::new(ErrorKind::InvalidType)
             .message(String::from("Tuple enums are not supported")))
     }
 
@@ -443,7 +443,7 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         V: de::Visitor<'de>,
     {
-        Err(Error::new(ErrorKind::UnexpectedType)
+        Err(Error::new(ErrorKind::InvalidType)
             .message(String::from("Struct enums are not supported")))
     }
 
@@ -452,7 +452,7 @@ impl<'de> de::VariantAccess<'de> for UnitOnly {
     where
         T: de::DeserializeSeed<'de>,
     {
-        Err(Error::new(ErrorKind::UnexpectedType)
+        Err(Error::new(ErrorKind::InvalidType)
             .message(String::from("NewType enums are not supported")))
     }
 }

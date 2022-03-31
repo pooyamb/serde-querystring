@@ -1,7 +1,7 @@
 //! These tests are meant for the `UrlEncodedQS` method
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config};
+use serde_querystring::de::{from_bytes, Config, ErrorKind};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
@@ -65,25 +65,52 @@ fn deserialize_decoded_keys() {
 }
 
 #[test]
-fn deserialize_invalid_sequence() {
-    // array length
-    assert!(from_bytes::<Primitive<[usize; 3]>>(
-        b"value=1&value=3&value=1337&value=999",
-        Config::UrlEncoded
-    )
-    .is_err());
+fn deserialize_error_type() {
+    // we don't support sequences in this mode
+    assert_eq!(
+        from_bytes::<Primitive<[usize; 3]>>(
+            b"value=1&value=3&value=1337&value=999",
+            Config::UrlEncoded,
+        )
+        .unwrap_err()
+        .kind,
+        ErrorKind::InvalidType
+    );
 
-    // tuple length
-    assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
-        b"value=1&value=3&value=1337&value=999",
-        Config::UrlEncoded
-    )
-    .is_err());
+    assert_eq!(
+        from_bytes::<Primitive<(usize, usize, usize)>>(
+            b"value=1&value=3&value=1337&value=999",
+            Config::UrlEncoded,
+        )
+        .unwrap_err()
+        .kind,
+        ErrorKind::InvalidType
+    );
 
-    // tuple value types
-    assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
-        b"value=foo&value=bar&value=baz",
-        Config::UrlEncoded
-    )
-    .is_err());
+    // We don't support non-unit enums
+    #[derive(Debug, Deserialize)]
+    enum ValueEnum {
+        A(i32, i32),
+        B(i32),
+        C {},
+    }
+
+    assert_eq!(
+        from_bytes::<Primitive<ValueEnum>>(b"value=A&value=B&key=value", Config::UrlEncoded)
+            .unwrap_err()
+            .kind,
+        ErrorKind::InvalidType
+    );
+    assert_eq!(
+        from_bytes::<Primitive<ValueEnum>>(b"value=B", Config::UrlEncoded)
+            .unwrap_err()
+            .kind,
+        ErrorKind::InvalidType
+    );
+    assert_eq!(
+        from_bytes::<Primitive<ValueEnum>>(b"value=C", Config::UrlEncoded)
+            .unwrap_err()
+            .kind,
+        ErrorKind::InvalidType
+    );
 }

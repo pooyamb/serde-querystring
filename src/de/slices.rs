@@ -24,7 +24,7 @@ pub trait Value<'de> {
 
 #[inline]
 fn invalid_boolean_error(slice: &[u8]) -> Error {
-    Error::new(ErrorKind::InvalidBoolean).slice(slice).message(
+    Error::new(ErrorKind::InvalidBoolean).value(slice).message(
         "invalid boolean {}, supported values are 1, on and true for true \
         and 0, off and false for false"
             .to_string(),
@@ -47,7 +47,7 @@ impl<'de> Value<'de> for ParsedSlice<'de> {
     {
         lexical::parse(&self.0).map_err(|e| {
             Error::new(ErrorKind::InvalidNumber)
-                .slice(&self.0)
+                .value(&self.0)
                 .message(e.to_string())
         })
     }
@@ -88,7 +88,7 @@ impl<'de> Value<'de> for ParsedSlice<'de> {
         res.map_err(|(error, slice)| {
             Error::new(ErrorKind::InvalidEncoding)
                 .message("invalid utf-8 sequence found in the percent decoded value".to_string())
-                .slice(&slice)
+                .value(&slice)
                 .index(error.valid_up_to())
         })
     }
@@ -114,7 +114,7 @@ impl<'de> Value<'de> for RawSlice<'de> {
     {
         lexical::parse(self.0).map_err(|e| {
             Error::new(ErrorKind::InvalidNumber)
-                .slice(self.0)
+                .value(self.0)
                 .message(e.to_string())
         })
     }
@@ -149,7 +149,7 @@ impl<'de> Value<'de> for RawSlice<'de> {
                     .message(
                         "invalid utf-8 sequence found in the percent decoded value".to_string(),
                     )
-                    .slice(slice)
+                    .value(slice)
                     .index(error.valid_up_to())
             })
     }
