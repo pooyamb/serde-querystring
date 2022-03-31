@@ -1,7 +1,7 @@
 //! These tests are meant for the `DuplicateQS` method
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config};
+use serde_querystring::de::{from_bytes, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
@@ -39,7 +39,7 @@ fn deserialize_duplicate() {
     assert_eq!(
         from_bytes(
             b"foo=bar&foobar=1337&foo=baz&bar=13&vec=1337&vec=11",
-            Config::Duplicate
+            ParseMode::Duplicate
         ),
         Ok(Duplicate {
             foo: "baz",
@@ -54,12 +54,12 @@ fn deserialize_duplicate() {
 fn deserialize_value() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!(1337))
     );
 
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!("1337"))
     );
 }
@@ -68,23 +68,23 @@ fn deserialize_value() {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!(vec![1, 3, 1337]))
     );
 
     // array
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!([1, 3, 1337]))
     );
 
     // tuple
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!((1, 3, 1337)))
     );
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::Duplicate),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::Duplicate),
         Ok(p!((true, "3", 1337)))
     );
 
@@ -97,7 +97,7 @@ fn deserialize_sequence() {
 
     // unit enums in sequence
     assert_eq!(
-        from_bytes(b"value=God&value=Left&value=Right", Config::Duplicate),
+        from_bytes(b"value=God&value=Left&value=Right", ParseMode::Duplicate),
         Ok(p!(vec![Side::God, Side::Left, Side::Right]))
     );
 }
@@ -107,7 +107,7 @@ fn deserialize_decoded_keys() {
     // having different encoded kinds of the string `value` for key
     // `v%61lu%65` `valu%65` `value`
     assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Duplicate),
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", ParseMode::Duplicate),
         Ok(p!(vec!["1", "2", "3"]))
     );
 }
@@ -117,21 +117,21 @@ fn deserialize_invalid_sequence() {
     // array length
     assert!(from_bytes::<Primitive<[usize; 3]>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Duplicate
+        ParseMode::Duplicate
     )
     .is_err());
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Duplicate
+        ParseMode::Duplicate
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
         b"value=foo&value=bar&value=baz",
-        Config::Duplicate
+        ParseMode::Duplicate
     )
     .is_err());
 }

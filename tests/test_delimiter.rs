@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config};
+use serde_querystring::de::{from_bytes, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
@@ -41,7 +41,7 @@ fn deserialize_delimiter() {
     assert_eq!(
         from_bytes(
             b"foo=bar&foobar=1337&foo=baz&bar=13&vec=1337|11",
-            Config::Delimiter(b'|')
+            ParseMode::Delimiter(b'|')
         ),
         Ok(Delimiter {
             foo: "baz",
@@ -56,13 +56,13 @@ fn deserialize_delimiter() {
 fn deserialize_repeated_keys() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1|2|3&value=4|5|6", Config::Delimiter(b'|')),
+        from_bytes(b"value=1|2|3&value=4|5|6", ParseMode::Delimiter(b'|')),
         Ok(p!(vec![4, 5, 6]))
     );
 
     // vector
     assert_eq!(
-        from_bytes(b"value=1337&value=7331", Config::Delimiter(b'|')),
+        from_bytes(b"value=1337&value=7331", ParseMode::Delimiter(b'|')),
         Ok(p!(7331))
     );
 }
@@ -71,33 +71,36 @@ fn deserialize_repeated_keys() {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value=1|3|1337", ParseMode::Delimiter(b'|')),
         Ok(p!(vec![1, 3, 1337]))
     );
     assert_eq!(
-        from_bytes(b"value=1,3,1337", Config::Delimiter(b',')),
+        from_bytes(b"value=1,3,1337", ParseMode::Delimiter(b',')),
         Ok(p!(vec![1, 3, 1337]))
     );
 
     // array
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value=1|3|1337", ParseMode::Delimiter(b'|')),
         Ok(p!([1, 3, 1337]))
     );
 
     // tuple
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value=1|3|1337", ParseMode::Delimiter(b'|')),
         Ok(p!((1, 3, 1337)))
     );
     assert_eq!(
-        from_bytes(b"value=1|3|1337", Config::Delimiter(b'|')),
+        from_bytes(b"value=1|3|1337", ParseMode::Delimiter(b'|')),
         Ok(p!((true, "3", 1337)))
     );
 
     // More values than expected, we will try to recover if possible
     assert_eq!(
-        from_bytes(b"value=more|values|than|expected", Config::Delimiter(b'|')),
+        from_bytes(
+            b"value=more|values|than|expected",
+            ParseMode::Delimiter(b'|')
+        ),
         Ok(p!(("more", "values", "than|expected")))
     );
 }
@@ -117,7 +120,7 @@ fn deserialize_unit_enums() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Delimiter(b'|')),
+        from_bytes(b"God=winner&Right=looser", ParseMode::Delimiter(b'|')),
         Ok(map)
     );
 
@@ -128,7 +131,7 @@ fn deserialize_unit_enums() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Delimiter(b'|')),
+        from_bytes::<A>(b"looser=Left&winner=God", ParseMode::Delimiter(b'|')),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -143,7 +146,7 @@ fn deserialize_unit_enums() {
 
     // unit enums in sequence
     assert_eq!(
-        from_bytes(b"value=God|Left|Right", Config::Delimiter(b'|')),
+        from_bytes(b"value=God|Left|Right", ParseMode::Delimiter(b'|')),
         Ok(VecEnum {
             value: vec![Side::God, Side::Left, Side::Right]
         })
@@ -154,21 +157,21 @@ fn deserialize_unit_enums() {
 fn deserialize_invalid_sequence() {
     // array length
     assert!(
-        from_bytes::<Primitive<[usize; 3]>>(b"value=1|3|1337|999", Config::Delimiter(b'|'))
+        from_bytes::<Primitive<[usize; 3]>>(b"value=1|3|1337|999", ParseMode::Delimiter(b'|'))
             .is_err()
     );
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
         b"1|3|1337|999",
-        Config::Delimiter(b'|')
+        ParseMode::Delimiter(b'|')
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
         b"value=foo|bar|baz",
-        Config::Delimiter(b'|')
+        ParseMode::Delimiter(b'|')
     )
     .is_err());
 }

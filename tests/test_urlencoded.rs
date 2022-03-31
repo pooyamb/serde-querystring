@@ -1,7 +1,7 @@
 //! These tests are meant for the `UrlEncodedQS` method
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config, ErrorKind};
+use serde_querystring::de::{from_bytes, ErrorKind, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
@@ -36,7 +36,7 @@ struct UrlEncoded<'a> {
 #[test]
 fn deserialize_urlencoded() {
     assert_eq!(
-        from_bytes(b"foo=bar&foobar=1337&foo=baz&bar=13", Config::UrlEncoded),
+        from_bytes(b"foo=bar&foobar=1337&foo=baz&bar=13", ParseMode::UrlEncoded),
         Ok(UrlEncoded {
             foo: "baz",
             foobar: 1337,
@@ -49,7 +49,7 @@ fn deserialize_urlencoded() {
 fn deserialize_repeated_keys() {
     // vector
     assert_eq!(
-        from_bytes(b"value=1&value=3&value=1337", Config::UrlEncoded),
+        from_bytes(b"value=1&value=3&value=1337", ParseMode::UrlEncoded),
         Ok(p!(1337))
     );
 }
@@ -59,7 +59,7 @@ fn deserialize_decoded_keys() {
     // having different encoded kinds of the string `value` for key
     // `v%61lu%65` `valu%65` `value`
     assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::UrlEncoded),
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", ParseMode::UrlEncoded),
         Ok(p!(3))
     );
 }
@@ -70,7 +70,7 @@ fn deserialize_error_type() {
     assert_eq!(
         from_bytes::<Primitive<[usize; 3]>>(
             b"value=1&value=3&value=1337&value=999",
-            Config::UrlEncoded,
+            ParseMode::UrlEncoded,
         )
         .unwrap_err()
         .kind,
@@ -80,7 +80,7 @@ fn deserialize_error_type() {
     assert_eq!(
         from_bytes::<Primitive<(usize, usize, usize)>>(
             b"value=1&value=3&value=1337&value=999",
-            Config::UrlEncoded,
+            ParseMode::UrlEncoded,
         )
         .unwrap_err()
         .kind,
@@ -96,19 +96,19 @@ fn deserialize_error_type() {
     }
 
     assert_eq!(
-        from_bytes::<Primitive<ValueEnum>>(b"value=A&value=B&key=value", Config::UrlEncoded)
+        from_bytes::<Primitive<ValueEnum>>(b"value=A&value=B&key=value", ParseMode::UrlEncoded)
             .unwrap_err()
             .kind,
         ErrorKind::InvalidType
     );
     assert_eq!(
-        from_bytes::<Primitive<ValueEnum>>(b"value=B", Config::UrlEncoded)
+        from_bytes::<Primitive<ValueEnum>>(b"value=B", ParseMode::UrlEncoded)
             .unwrap_err()
             .kind,
         ErrorKind::InvalidType
     );
     assert_eq!(
-        from_bytes::<Primitive<ValueEnum>>(b"value=C", Config::UrlEncoded)
+        from_bytes::<Primitive<ValueEnum>>(b"value=C", ParseMode::UrlEncoded)
             .unwrap_err()
             .kind,
         ErrorKind::InvalidType

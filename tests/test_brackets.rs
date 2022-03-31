@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config};
+use serde_querystring::de::{from_bytes, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
@@ -41,7 +41,7 @@ fn deserialize_brackets() {
     assert_eq!(
         from_bytes(
             b"foo=bar&foobar=1337&foo=baz&bar=13&vec[1]=1337&vec=11",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(Brackets {
             foo: "baz",
@@ -56,23 +56,23 @@ fn deserialize_brackets() {
 fn deserialize_sequence() {
     // vector
     assert_eq!(
-        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", Config::Brackets),
+        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", ParseMode::Brackets),
         Ok(p!(vec![1, 3, 1337]))
     );
 
     // array
     assert_eq!(
-        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", Config::Brackets),
+        from_bytes(b"value[3]=1337&value[2]=3&value[1]=1", ParseMode::Brackets),
         Ok(p!([1, 3, 1337]))
     );
 
     // tuple
     assert_eq!(
-        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", Config::Brackets),
+        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", ParseMode::Brackets),
         Ok(p!((1, 3, 1337)))
     );
     assert_eq!(
-        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", Config::Brackets),
+        from_bytes(b"value[0]=1&value[1]=3&value[2]=1337", ParseMode::Brackets),
         Ok(p!((true, "3", 1337)))
     );
 }
@@ -83,7 +83,7 @@ fn deserialize_struct_value() {
     assert_eq!(
         from_bytes(
             b"value[value][3]=1337&value[value][2]=3&value[value][1]=1",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(p!(p!(vec![1, 3, 1337])))
     );
@@ -97,7 +97,7 @@ fn deserialize_struct_value() {
     }
 
     assert_eq!(
-        from_bytes(b"foo[value]=bar&qux[value]=foobar", Config::Brackets),
+        from_bytes(b"foo[value]=bar&qux[value]=foobar", ParseMode::Brackets),
         Ok(Sample2 {
             foo: p!("bar"),
             qux: p!("foobar")
@@ -120,7 +120,7 @@ fn deserialize_unit_enums() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::Brackets),
+        from_bytes(b"God=winner&Right=looser", ParseMode::Brackets),
         Ok(map)
     );
 
@@ -131,7 +131,7 @@ fn deserialize_unit_enums() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::Brackets),
+        from_bytes::<A>(b"looser=Left&winner=God", ParseMode::Brackets),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -146,7 +146,7 @@ fn deserialize_unit_enums() {
 
     // unit enums in sequence
     assert_eq!(
-        from_bytes(b"value=God&value=Left&value=Right", Config::Brackets),
+        from_bytes(b"value=God&value=Left&value=Right", ParseMode::Brackets),
         Ok(VecEnum {
             value: vec![Side::God, Side::Left, Side::Right]
         })
@@ -164,21 +164,24 @@ fn deserialize_enums() {
     }
 
     assert_eq!(
-        from_bytes(b"value=Unit", Config::Brackets),
+        from_bytes(b"value=Unit", ParseMode::Brackets),
         Ok(p!(Enum::Unit))
     );
     assert_eq!(
-        from_bytes(b"value[NewType]=2022", Config::Brackets),
+        from_bytes(b"value[NewType]=2022", ParseMode::Brackets),
         Ok(p!(Enum::NewType(2022)))
     );
     assert_eq!(
-        from_bytes(b"value[Tuple][0]=100&value[Tuple][1]=200", Config::Brackets),
+        from_bytes(
+            b"value[Tuple][0]=100&value[Tuple][1]=200",
+            ParseMode::Brackets
+        ),
         Ok(p!(Enum::Tuple(100, 200)))
     );
     assert_eq!(
         from_bytes(
             b"value[Struct][bee]=833&value[Struct][loose]=10053",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(p!(Enum::Struct {
             bee: 833,
@@ -190,14 +193,14 @@ fn deserialize_enums() {
     assert_eq!(
         from_bytes(
             b"value[Struct][bee]=833&value[Struct][loose]=10053&value[NewType]=100",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(p!(Enum::NewType(100)))
     );
     assert_eq!(
         from_bytes(
             b"value[Struct][bee]=833&value[NewType]=100&value[Struct][loose]=10053",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(p!(Enum::Struct {
             bee: 833,
@@ -207,7 +210,7 @@ fn deserialize_enums() {
     assert_eq!(
         from_bytes(
             b"value[Struct][bee]=833&value[NewType]=100&value[Struct][loose]=10053&value=Unit",
-            Config::Brackets
+            ParseMode::Brackets
         ),
         Ok(p!(Enum::Unit))
     );
@@ -218,21 +221,21 @@ fn deserialize_invalid_sequence() {
     // array length
     assert!(from_bytes::<Primitive<[usize; 3]>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Brackets
+        ParseMode::Brackets
     )
     .is_err());
 
     // tuple length
     assert!(from_bytes::<Primitive<(usize, usize, usize)>>(
         b"value=1&value=3&value=1337&value=999",
-        Config::Brackets
+        ParseMode::Brackets
     )
     .is_err());
 
     // tuple value types
     assert!(from_bytes::<Primitive<(&str, usize, &str)>>(
         b"value=foo&value=bar&value=baz",
-        Config::Brackets
+        ParseMode::Brackets
     )
     .is_err());
 }
@@ -242,7 +245,7 @@ fn deserialize_decoded_keys() {
     // having different encoded kinds of the string `value` for key
     // `v%61lu%65` `valu%65` `value`
     assert_eq!(
-        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", Config::Brackets),
+        from_bytes(b"v%61lu%65=1&valu%65=2&value=3", ParseMode::Brackets),
         Ok(p!(vec!["1", "2", "3"]))
     );
 }

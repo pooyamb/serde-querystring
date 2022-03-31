@@ -3,10 +3,10 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_querystring::de::{from_bytes, Config, Error, ErrorKind};
+use serde_querystring::de::{from_bytes, Error, ErrorKind, ParseMode};
 
 fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
-    from_bytes(input.as_bytes(), Config::UrlEncoded)
+    from_bytes(input.as_bytes(), ParseMode::UrlEncoded)
 }
 
 /// It is a helper struct we use to test primitive types
@@ -81,7 +81,7 @@ fn deserialize_integer_valid() {
     assert_eq!(
         from_bytes(
             b"-1337=value1&-7331=value2&1337=value3&7331=value4",
-            Config::UrlEncoded
+            ParseMode::UrlEncoded
         ),
         Ok(map)
     );
@@ -123,7 +123,7 @@ fn deserialize_bool() {
     map.insert(true, "value1");
     map.insert(false, "value2");
     assert_eq!(
-        from_bytes(b"true=value1&off=value2", Config::UrlEncoded),
+        from_bytes(b"true=value1&off=value2", ParseMode::UrlEncoded),
         Ok(map)
     );
 }
@@ -142,7 +142,7 @@ fn deserialize_str() {
     map.insert("some", "value1");
     map.insert("bytes", "value2");
     assert_eq!(
-        from_bytes(b"some=value1&bytes=value2", Config::UrlEncoded),
+        from_bytes(b"some=value1&bytes=value2", ParseMode::UrlEncoded),
         Ok(map)
     );
 }
@@ -165,7 +165,7 @@ fn deserialize_strings() {
     map.insert(String::from("some"), "value1");
     map.insert(String::from("st ri ng"), "value2");
     assert_eq!(
-        from_bytes(b"some=value1&st+ri+ng=value2", Config::UrlEncoded),
+        from_bytes(b"some=value1&st+ri+ng=value2", ParseMode::UrlEncoded),
         Ok(map)
     );
 }
@@ -192,7 +192,7 @@ fn deserialize_bytes() {
     map.insert(serde_bytes::Bytes::new(b"some"), "value1");
     map.insert(serde_bytes::Bytes::new(b"bytes"), "value2");
     assert_eq!(
-        from_bytes(b"some=value1&bytes=value2", Config::UrlEncoded),
+        from_bytes(b"some=value1&bytes=value2", ParseMode::UrlEncoded),
         Ok(map)
     );
 }
@@ -221,7 +221,7 @@ fn deserialize_byte_vecs() {
     map.insert(serde_bytes::ByteBuf::from("some"), "value1");
     map.insert(serde_bytes::ByteBuf::from("by\0te s"), "value2");
     assert_eq!(
-        from_bytes(b"some=value1&by%00te+s=value2", Config::UrlEncoded),
+        from_bytes(b"some=value1&by%00te+s=value2", ParseMode::UrlEncoded),
         Ok(map)
     );
 }
@@ -236,7 +236,7 @@ fn deserialize_unit_enum() {
         winner: Side,
     }
     assert_eq!(
-        from_bytes::<A>(b"looser=Left&winner=God", Config::UrlEncoded),
+        from_bytes::<A>(b"looser=Left&winner=God", ParseMode::UrlEncoded),
         Ok(A {
             looser: Side::Left,
             winner: Side::God
@@ -248,7 +248,7 @@ fn deserialize_unit_enum() {
     map.insert(Side::God, "winner");
     map.insert(Side::Right, "looser");
     assert_eq!(
-        from_bytes(b"God=winner&Right=looser", Config::UrlEncoded),
+        from_bytes(b"God=winner&Right=looser", ParseMode::UrlEncoded),
         Ok(map)
     );
 }

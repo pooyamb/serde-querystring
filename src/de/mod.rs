@@ -87,33 +87,33 @@ where
 }
 
 #[derive(Clone, Copy)]
-pub enum Config {
+pub enum ParseMode {
     UrlEncoded,
     Duplicate,
     Delimiter(u8),
     Brackets,
 }
 
-pub fn from_bytes<'de, T>(input: &'de [u8], config: Config) -> Result<T, Error>
+pub fn from_bytes<'de, T>(input: &'de [u8], config: ParseMode) -> Result<T, Error>
 where
     T: de::Deserialize<'de>,
 {
     match config {
-        Config::UrlEncoded => {
+        ParseMode::UrlEncoded => {
             // A simple key=value parser
             T::deserialize(QSDeserializer::new(UrlEncodedQS::parse(input).into_iter()))
         }
-        Config::Duplicate => {
+        ParseMode::Duplicate => {
             // A parser with duplicated keys interpreted as sequence
             T::deserialize(QSDeserializer::new(DuplicateQS::parse(input).into_iter()))
         }
-        Config::Delimiter(s) => {
+        ParseMode::Delimiter(s) => {
             // A parser with sequences of values seperated by one character
             T::deserialize(QSDeserializer::new(
                 DelimiterQS::parse(input, s).into_iter(),
             ))
         }
-        Config::Brackets => {
+        ParseMode::Brackets => {
             // A PHP like interpretation of querystrings
             T::deserialize(QSDeserializer::new(BracketsQS::parse(input).into_iter()))
         }
