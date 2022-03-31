@@ -7,13 +7,13 @@ use serde::{de, forward_to_deserialize_any};
 pub use error::{Error, ErrorKind};
 
 pub(crate) mod __implementors {
-    pub use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
-    pub use super::traits::{IntoDeserializer, IntoSizedIterator};
+    pub(crate) use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
+    pub(crate) use super::traits::{IntoDeserializer, IntoSizedIterator};
 }
 
 use crate::parsers::{BracketsQS, DelimiterQS, DuplicateQS, UrlEncodedQS};
 
-pub struct QSDeserializer<I, T> {
+struct QSDeserializer<I, T> {
     iter: I,
     value: Option<T>,
     scratch: Vec<u8>,
