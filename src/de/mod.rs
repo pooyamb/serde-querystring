@@ -119,3 +119,10 @@ where
         }
     }
 }
+
+pub fn from_str<'de, T>(input: &'de str, config: ParseMode) -> Result<T, Error>
+where
+    T: de::Deserialize<'de>,
+{
+    from_bytes(input.as_bytes(), config)
+}
