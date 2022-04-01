@@ -1,11 +1,12 @@
 //! These tests are meant for the `UrlEncodedQS` method
 
-use serde::Deserialize;
+use _serde::Deserialize;
 use serde_querystring::de::{from_bytes, ErrorKind, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
 #[derive(Debug, PartialEq, Deserialize)]
+#[serde(crate = "_serde")]
 struct Primitive<T> {
     value: T,
 }
@@ -26,6 +27,7 @@ macro_rules! p {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(crate = "_serde")]
 struct UrlEncoded<'a> {
     #[serde(borrow)]
     foo: &'a str,
@@ -89,6 +91,7 @@ fn deserialize_error_type() {
 
     // We don't support non-unit enums
     #[derive(Debug, Deserialize)]
+    #[serde(crate = "_serde")]
     enum ValueEnum {
         A(i32, i32),
         B(i32),

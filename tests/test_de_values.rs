@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use _serde::Deserialize;
 use serde_querystring::de::{from_bytes, Error, ErrorKind, ParseMode};
 
 fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
@@ -12,6 +12,7 @@ fn from_str<'de, T: Deserialize<'de>>(input: &'de str) -> Result<T, Error> {
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
 #[derive(Debug, PartialEq, Deserialize)]
+#[serde(crate = "_serde")]
 struct Primitive<T> {
     value: T,
 }
@@ -32,6 +33,7 @@ macro_rules! p {
 }
 
 #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
+#[serde(crate = "_serde")]
 enum Side {
     Left,
     Right,
@@ -231,6 +233,7 @@ fn deserialize_byte_vecs() {
 fn deserialize_unit_enum() {
     // unit enums as map values
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
     struct A {
         looser: Side,
         winner: Side,
@@ -263,6 +266,7 @@ fn deserialize_option() {
 #[test]
 fn deserialize_new_type() {
     #[derive(Debug, Deserialize, Eq, PartialEq)]
+    #[serde(crate = "_serde")]
     struct NewType(i32);
 
     assert_eq!(from_str("value=-2500000"), Ok(p!(NewType(-2_500_000))));

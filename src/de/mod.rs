@@ -2,7 +2,7 @@ mod error;
 mod slices;
 mod traits;
 
-use serde::{de, forward_to_deserialize_any};
+use _serde::{de, forward_to_deserialize_any};
 
 pub use error::{Error, ErrorKind};
 

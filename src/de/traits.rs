@@ -1,7 +1,7 @@
 use std::str;
 
+use _serde::{de, forward_to_deserialize_any};
 use lexical::{self, FromLexical};
-use serde::{de, forward_to_deserialize_any};
 
 use crate::decode::Reference;
 

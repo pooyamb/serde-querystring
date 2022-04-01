@@ -228,7 +228,7 @@ impl<'a> BracketsQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use serde::{de, forward_to_deserialize_any, Deserializer};
+    use _serde::{de, forward_to_deserialize_any, Deserializer};
 
     use crate::de::{
         Error, ErrorKind,

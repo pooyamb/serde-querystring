@@ -47,7 +47,7 @@ impl Error {
     }
 }
 
-impl serde::de::Error for Error {
+impl _serde::de::Error for Error {
     fn custom<T>(msg: T) -> Self
     where
         T: fmt::Display,
@@ -55,7 +55,7 @@ impl serde::de::Error for Error {
         Error::new(ErrorKind::Other).message(msg.to_string())
     }
 
-    fn invalid_type(unexp: serde::de::Unexpected, exp: &dyn serde::de::Expected) -> Self {
+    fn invalid_type(unexp: _serde::de::Unexpected, exp: &dyn _serde::de::Expected) -> Self {
         Error::new(ErrorKind::InvalidType)
             .message(format_args!("invalid type: {}, expected {}", unexp, exp).to_string())
     }

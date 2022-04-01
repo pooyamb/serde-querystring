@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use _serde::Deserialize;
 use serde_querystring::de::{from_bytes, ParseMode};
 
 /// It is a helper struct we use to test primitive types
 /// as we don't support anything beside maps/structs at the root level
 #[derive(Debug, PartialEq, Deserialize)]
+#[serde(crate = "_serde")]
 struct Primitive<T> {
     value: T,
 }
@@ -28,6 +29,7 @@ macro_rules! p {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(crate = "_serde")]
 struct Brackets<'a> {
     #[serde(borrow)]
     foo: &'a str,
@@ -89,6 +91,7 @@ fn deserialize_struct_value() {
     );
 
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
     struct Sample2<'a> {
         #[serde(borrow)]
         foo: Primitive<&'a str>,
@@ -109,6 +112,7 @@ fn deserialize_struct_value() {
 #[test]
 fn deserialize_unit_enums() {
     #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
+    #[serde(crate = "_serde")]
     enum Side {
         Left,
         Right,
@@ -126,6 +130,7 @@ fn deserialize_unit_enums() {
 
     // unit enums as map values
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
     struct A {
         looser: Side,
         winner: Side,
@@ -140,6 +145,7 @@ fn deserialize_unit_enums() {
 
     // unit enums as map values
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
     struct VecEnum {
         value: Vec<Side>,
     }
@@ -156,6 +162,7 @@ fn deserialize_unit_enums() {
 #[test]
 fn deserialize_enums() {
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
     enum Enum {
         Unit,
         NewType(i32),
