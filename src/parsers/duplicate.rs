@@ -2,9 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, Reference};
 
-pub struct Key<'a> {
-    slice: &'a [u8],
-}
+pub struct Key<'a>(&'a [u8]);
 
 impl<'a> Key<'a> {
     fn parse(slice: &'a [u8]) -> Self {
@@ -16,17 +14,15 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self {
-            slice: &slice[..index],
-        }
+        Self(&slice[..index])
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 

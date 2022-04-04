@@ -2,9 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, Reference};
 
-pub struct Key<'a> {
-    slice: &'a [u8],
-}
+pub struct Key<'a>(&'a [u8]);
 
 impl<'a> Key<'a> {
     fn parse(slice: &'a [u8]) -> Self {
@@ -16,23 +14,19 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self {
-            slice: &slice[..index],
-        }
+        Self(&slice[..index])
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
-pub struct Value<'a> {
-    slice: &'a [u8],
-}
+pub struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
@@ -48,17 +42,15 @@ impl<'a> Value<'a> {
             }
         }
 
-        Some(Self {
-            slice: &slice[1..index],
-        })
+        Some(Self(&slice[1..index]))
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
@@ -135,7 +127,7 @@ mod de {
         ) -> impl Iterator<Item = (ParsedSlice<'a>, OptionalRawSlice<'a>)> {
             self.pairs
                 .into_iter()
-                .map(|(key, pair)| (ParsedSlice(key), OptionalRawSlice(pair.1.map(|v| v.slice))))
+                .map(|(key, pair)| (ParsedSlice(key), OptionalRawSlice(pair.1.map(|v| v.0))))
         }
     }
 }

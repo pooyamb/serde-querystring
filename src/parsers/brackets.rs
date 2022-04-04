@@ -3,10 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 use crate::decode::{parse_bytes, Reference};
 
 #[derive(Default, Clone, Copy)]
-pub struct Key<'a> {
-    slice: &'a [u8],
-    remains: Option<&'a [u8]>,
-}
+pub struct Key<'a>(&'a [u8], Option<&'a [u8]>);
 
 impl<'a> Key<'a> {
     fn parse(slice: &'a [u8]) -> Self {
@@ -19,10 +16,7 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self {
-            slice: &slice[..index],
-            remains: None,
-        }
+        Self(&slice[..index], None)
     }
 
     fn parse_remains(key: &'a [u8], slice: &'a [u8]) -> Self {
@@ -34,14 +28,11 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self {
-            slice: key,
-            remains: Some(&slice[..index]),
-        }
+        Self(key, Some(&slice[..index]))
     }
 
     fn subkey(self) -> Option<Self> {
-        let remains = self.remains?;
+        let remains = self.1?;
 
         let mut index = 0;
         while index < remains.len() {
@@ -52,41 +43,33 @@ impl<'a> Key<'a> {
         }
 
         if index + 1 < remains.len() && remains[index + 1] == b'[' {
-            Some(Self {
-                slice: &remains[..index],
-                remains: Some(&remains[index + 2..]),
-            })
+            Some(Self(&remains[..index], Some(&remains[index + 2..])))
         } else {
-            Some(Self {
-                slice: &remains[..index],
-                remains: None,
-            })
+            Some(Self(&remains[..index], None))
         }
     }
 
     fn has_subkey(&self) -> bool {
-        match self.remains {
+        match self.1 {
             Some(bytes) => bytes.iter().any(|c| *c == b']'),
             None => false,
         }
     }
 
     fn len(&self) -> usize {
-        match self.remains {
-            Some(r) => r.len() + self.slice.len() + 1,
-            None => self.slice.len(),
+        match self.1 {
+            Some(r) => r.len() + self.0.len() + 1,
+            None => self.0.len(),
         }
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
 #[derive(Default, Clone, Copy)]
-pub struct Value<'a> {
-    slice: &'a [u8],
-}
+pub struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
@@ -102,21 +85,19 @@ impl<'a> Value<'a> {
             }
         }
 
-        Some(Self {
-            slice: &slice[1..index],
-        })
+        Some(Self(&slice[1..index]))
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 
     pub fn slice(&self) -> &'a [u8] {
-        self.slice
+        self.0
     }
 }
 
@@ -264,12 +245,11 @@ mod de {
                 .into_iter()
                 .map(|pair| {
                     let index = match pair.0.subkey() {
-                        Some(subkey) if subkey.len() > 0 => {
-                            lexical::parse::<usize, _>(subkey.slice).map_err(|e| {
+                        Some(subkey) if subkey.len() > 0 => lexical::parse::<usize, _>(subkey.0)
+                            .map_err(|e| {
                                 Error::new(ErrorKind::InvalidNumber)
                                     .message(format!("invalid index: {}", e))
-                            })?
-                        }
+                            })?,
                         _ => 0,
                     };
                     Ok((index, RawSlice(pair.1.unwrap_or_default().slice())))
@@ -410,20 +390,18 @@ mod de {
             let last_pair = self.0.last().expect("Values iterator can't be empty");
             match last_pair.0.subkey() {
                 Some(subkey) => {
-                    println!("{}", unsafe { std::str::from_utf8_unchecked(subkey.slice) });
                     let mut scratch = self.1;
                     let pairs = BracketsQS::from_pairs(self.0.into_iter())
                         .pairs
-                        .remove(subkey.slice)
+                        .remove(subkey.0)
                         .unwrap();
-                    seed.deserialize(RawSlice(subkey.slice).into_deserializer(&mut scratch))
+                    seed.deserialize(RawSlice(subkey.0).into_deserializer(&mut scratch))
                         .map(move |v| (v, Self(pairs, scratch)))
                 }
                 None => {
                     let mut scratch = self.1;
                     seed.deserialize(
-                        RawSlice(last_pair.1.unwrap_or_default().slice)
-                            .into_deserializer(&mut scratch),
+                        RawSlice(last_pair.1.unwrap_or_default().0).into_deserializer(&mut scratch),
                     )
                     .map(move |v| (v, PairsDeserializer(Vec::new(), scratch)))
                 }

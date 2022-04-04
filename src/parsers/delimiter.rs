@@ -2,9 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, Reference};
 
-pub struct Key<'a> {
-    slice: &'a [u8],
-}
+pub struct Key<'a>(&'a [u8]);
 
 impl<'a> Key<'a> {
     fn parse(slice: &'a [u8]) -> Self {
@@ -16,34 +14,28 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self {
-            slice: &slice[..index],
-        }
+        Self(&slice[..index])
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
-pub struct Value<'a> {
-    slice: &'a [u8],
-}
+pub struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
 #[derive(Default)]
-pub struct Values<'a> {
-    slice: &'a [u8],
-}
+pub struct Values<'a>(&'a [u8]);
 
 impl<'a> Values<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
@@ -59,23 +51,21 @@ impl<'a> Values<'a> {
             }
         }
 
-        Some(Self {
-            slice: &slice[1..index],
-        })
+        Some(Self(&slice[1..index]))
     }
 
     fn len(&self) -> usize {
-        self.slice.len()
+        self.0.len()
     }
 
     fn values(&self, delimiter: u8) -> impl Iterator<Item = Value<'a>> {
-        self.slice
+        self.0
             .split(move |c| *c == delimiter)
-            .map(|slice| Value { slice })
+            .map(|slice| Value(slice))
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
-        parse_bytes(self.slice, scratch)
+        parse_bytes(self.0, scratch)
     }
 }
 
@@ -174,10 +164,7 @@ mod de {
             self.pairs.into_iter().map(move |(key, pair)| {
                 (
                     ParsedSlice(key),
-                    SeparatorValues::from_slice(
-                        pair.1.map(|v| v.slice).unwrap_or_default(),
-                        delimiter,
-                    ),
+                    SeparatorValues::from_slice(pair.1.map(|v| v.0).unwrap_or_default(), delimiter),
                 )
             })
         }
