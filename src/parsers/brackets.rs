@@ -507,6 +507,10 @@ mod de {
                     .into_deserializer(self.scratch),
             )
         }
+
+        fn size_hint(&self) -> Option<usize> {
+            self.iter.size_hint().1
+        }
     }
 }
 

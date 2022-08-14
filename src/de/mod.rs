@@ -84,6 +84,10 @@ where
             .expect("Method next_value called before next_key");
         seed.deserialize(value.into_deserializer(&mut self.scratch))
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        self.iter.size_hint().1
+    }
 }
 
 #[derive(Clone, Copy)]
