@@ -140,7 +140,7 @@ impl<'a> DuplicateQS<'a> {
 mod de {
     use crate::de::{
         Error, ErrorKind,
-        __implementors::{IntoSizedIterator, ParsedSlice, RawSlice},
+        __implementors::{IntoRawSlices, ParsedSlice, RawSlice},
     };
 
     use super::DuplicateQS;
@@ -169,7 +169,7 @@ mod de {
 
     pub struct DuplicateValueIter<I>(I);
 
-    impl<'a, I> IntoSizedIterator<'a> for DuplicateValueIter<I>
+    impl<'a, I> IntoRawSlices<'a> for DuplicateValueIter<I>
     where
         I: Iterator<Item = RawSlice<'a>>,
     {

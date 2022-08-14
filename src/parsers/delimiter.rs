@@ -152,7 +152,7 @@ impl<'a> DelimiterQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::__implementors::{IntoSizedIterator, ParsedSlice, RawSlice};
+    use crate::de::__implementors::{IntoRawSlices, ParsedSlice, RawSlice};
 
     use super::DelimiterQS;
 
@@ -181,7 +181,7 @@ mod de {
         }
     }
 
-    impl<'a> IntoSizedIterator<'a> for SeparatorValues<'a> {
+    impl<'a> IntoRawSlices<'a> for SeparatorValues<'a> {
         type SizedIterator = SizedValuesIterator<'a>;
 
         type UnSizedIterator = SizedValuesIterator<'a>;

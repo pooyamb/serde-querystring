@@ -196,7 +196,7 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait IntoSizedIterator<'de> {
+pub trait IntoRawSlices<'de> {
     type SizedIterator: Iterator<Item = RawSlice<'de>>;
     type UnSizedIterator: Iterator<Item = RawSlice<'de>>;
 
@@ -207,7 +207,7 @@ pub trait IntoSizedIterator<'de> {
 
 impl<'de, 's, I> IntoDeserializer<'de, 's> for I
 where
-    I: 'de + IntoSizedIterator<'de>,
+    I: 'de + IntoRawSlices<'de>,
 {
     type Deserializer = IterDeserializer<'s, I>;
 
@@ -220,7 +220,7 @@ pub struct IterDeserializer<'s, I>(I, &'s mut Vec<u8>);
 
 impl<'de, 's, I> IterDeserializer<'s, I>
 where
-    I: 'de + IntoSizedIterator<'de>,
+    I: 'de + IntoRawSlices<'de>,
 {
     fn parse_number<T>(self) -> Result<T, Error>
     where
@@ -251,7 +251,7 @@ macro_rules! deserialize_number {
 
 impl<'de, 's, I> de::Deserializer<'de> for IterDeserializer<'s, I>
 where
-    I: 'de + IntoSizedIterator<'de>,
+    I: 'de + IntoRawSlices<'de>,
 {
     type Error = Error;
 

@@ -8,7 +8,7 @@ pub use error::{Error, ErrorKind};
 
 pub(crate) mod __implementors {
     pub(crate) use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
-    pub(crate) use super::traits::{IntoDeserializer, IntoSizedIterator};
+    pub(crate) use super::traits::{IntoDeserializer, IntoRawSlices};
 }
 
 use crate::parsers::{BracketsQS, DelimiterQS, DuplicateQS, UrlEncodedQS};
