@@ -55,6 +55,14 @@ fn deserialize_delimiter() {
 }
 
 #[test]
+fn deserialize_string_with_delimiter() {
+    assert_eq!(
+        from_bytes(b"value=1337|11", ParseMode::Delimiter(b'|')),
+        Ok(p!("1337|11"))
+    )
+}
+
+#[test]
 fn deserialize_repeated_keys() {
     // vector
     assert_eq!(
