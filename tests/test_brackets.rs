@@ -256,3 +256,16 @@ fn deserialize_decoded_keys() {
         Ok(p!(vec!["1", "2", "3"]))
     );
 }
+
+#[test]
+fn deserialize_maps_of_maps() {
+    let mut map = HashMap::new();
+    map.insert("a", 1);
+    map.insert("b", 2);
+    map.insert("c", 3);
+
+    assert_eq!(
+        from_bytes(b"value[a]=1&value[b]=2&value[c]=3", ParseMode::Brackets),
+        Ok(p!(map))
+    );
+}
