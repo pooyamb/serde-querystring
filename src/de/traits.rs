@@ -202,6 +202,7 @@ pub trait IntoSizedIterator<'de> {
 
     fn into_sized_iterator(self, size: usize) -> Result<Self::SizedIterator, Error>;
     fn into_unsized_iterator(self) -> Self::UnSizedIterator;
+    fn into_single_slice(self) -> RawSlice<'de>;
 }
 
 impl<'de, 's, I> IntoDeserializer<'de, 's> for I
@@ -225,28 +226,12 @@ where
     where
         T: FromLexical,
     {
-        RawSlice(
-            self.0
-                .into_unsized_iterator()
-                .last()
-                .expect("Values iterator can't be empty")
-                .0,
-        )
-        .parse_number(self.1)
+        self.0.into_single_slice().parse_number(self.1)
     }
 
     #[inline]
     fn into_slice_deserializer(self) -> ValueDeserializer<'s, RawSlice<'de>> {
-        ValueDeserializer(
-            RawSlice(
-                self.0
-                    .into_unsized_iterator()
-                    .last()
-                    .expect("Values iterator can't be empty")
-                    .0,
-            ),
-            self.1,
-        )
+        ValueDeserializer(self.0.into_single_slice(), self.1)
     }
 }
 

@@ -176,6 +176,7 @@ mod de {
         type SizedIterator = I;
         type UnSizedIterator = I;
 
+        #[inline]
         fn into_sized_iterator(self, size: usize) -> Result<I, Error> {
             if self.0.size_hint().0 == size {
                 Ok(self.0)
@@ -184,8 +185,16 @@ mod de {
             }
         }
 
+        #[inline]
         fn into_unsized_iterator(self) -> I {
             self.0
+        }
+
+        #[inline]
+        fn into_single_slice(self) -> RawSlice<'a> {
+            self.0
+                .last()
+                .expect("Iterator has at least one value in it")
         }
     }
 }

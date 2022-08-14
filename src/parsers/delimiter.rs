@@ -186,6 +186,7 @@ mod de {
 
         type UnSizedIterator = SizedValuesIterator<'a>;
 
+        #[inline]
         fn into_sized_iterator(self, size: usize) -> Result<Self::SizedIterator, crate::de::Error> {
             Ok(SizedValuesIterator::new(
                 self.slice,
@@ -194,8 +195,14 @@ mod de {
             ))
         }
 
+        #[inline]
         fn into_unsized_iterator(self) -> Self::UnSizedIterator {
             SizedValuesIterator::new(self.slice, self.delimiter, None)
+        }
+
+        #[inline]
+        fn into_single_slice(self) -> RawSlice<'a> {
+            RawSlice(self.slice)
         }
     }
 
