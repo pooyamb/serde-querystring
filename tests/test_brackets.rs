@@ -297,3 +297,57 @@ fn deserialize_pencoded_brackets() {
         Ok(p!(map))
     );
 }
+
+#[test]
+fn deserialize_invalid_brackets() {
+    // No ending bracket
+    let map = map! {"value" => map! {"ccc25" => 3, "a" => 1, "bb" => 2}};
+    assert_eq!(
+        from_bytes(b"value[a]=1&value[bb]=2&value[ccc25=3", ParseMode::Brackets),
+        Ok(map)
+    );
+
+    // No ending bracket(encoded)
+    let map = map! {"value" => map! {"ccc25" => 3, "a" => 1, "bb" => 2}};
+    assert_eq!(
+        from_bytes(
+            b"value%5Ba%5D=1&value%5bbb%5D=2&value%5Bccc25=3",
+            ParseMode::Brackets
+        ),
+        Ok(map)
+    );
+
+    // No starting bracket
+    let map = map! {
+        "valuea]" => 1,
+        "valueccc25" => 3
+    };
+    assert_eq!(
+        from_bytes(b"valuea]=1&valueccc25=3", ParseMode::Brackets),
+        Ok(map)
+    );
+
+    // No starting bracket(encoded)
+    let map = map! {
+        String::from("valuea]") => 1,
+        String::from("value") => 2,
+        String::from("valueccc25") => 3
+    };
+    assert_eq!(
+        from_bytes(
+            b"valuea%5D=1&value%5bbb%5D=2&valueccc25=3",
+            ParseMode::Brackets
+        ),
+        Ok(map)
+    );
+
+    // No ending bracket and no equal sign
+    let map = map! {
+        String::from("value") => map! {"bb" => None},
+        String::from("valuea]") => map! {"bb" => Some(1)}
+    };
+    assert_eq!(
+        from_bytes(b"valuea%5D[bb]=1&value%5bbb", ParseMode::Brackets),
+        Ok(map)
+    );
+}
