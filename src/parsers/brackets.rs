@@ -1,25 +1,38 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use crate::decode::{parse_bytes, Reference};
+use crate::decode::{parse_bytes, parse_char, Reference};
 
 #[derive(Default, Clone, Copy)]
 pub struct Key<'a>(&'a [u8], Option<&'a [u8]>);
 
 impl<'a> Key<'a> {
-    fn parse(slice: &'a [u8]) -> Self {
+    fn parse(slice: &'a [u8]) -> (Self, usize) {
         let mut index = 0;
         while index < slice.len() {
             match slice[index] {
-                b'[' => return Key::parse_remains(&slice[..index], &slice[(index + 1)..]),
+                b'[' => {
+                    let res = Key::parse_remains(&slice[..index], &slice[(index + 1)..]);
+                    return (res.0, res.1 + index + 1);
+                }
+                b'%' => {
+                    // Percent encoded opening bracket
+                    if index + 2 < slice.len()
+                        && parse_char(slice[index + 1], slice[index + 2]) == Some(b'[')
+                    {
+                        let res = Key::parse_remains(&slice[..index], &slice[(index + 3)..]);
+                        return (res.0, res.1 + index + 3);
+                    };
+                    index += 1;
+                }
                 b'&' | b'=' => break,
                 _ => index += 1,
             }
         }
 
-        Self(&slice[..index], None)
+        (Self(&slice[..index], None), index)
     }
 
-    fn parse_remains(key: &'a [u8], slice: &'a [u8]) -> Self {
+    fn parse_remains(key: &'a [u8], slice: &'a [u8]) -> (Self, usize) {
         let mut index = 0;
         while index < slice.len() {
             match slice[index] {
@@ -28,38 +41,77 @@ impl<'a> Key<'a> {
             }
         }
 
-        Self(key, Some(&slice[..index]))
+        (Self(key, Some(&slice[..index])), index)
     }
 
     fn subkey(self) -> Option<Self> {
         let remains = self.1?;
 
+        let mut key_end_index = 0;
         let mut index = 0;
         while index < remains.len() {
             match remains[index] {
-                b']' => break,
+                b']' => {
+                    key_end_index = index;
+                    break;
+                }
+                b'%' => {
+                    // Percent encoded opening bracket
+                    if index + 2 < remains.len()
+                        && parse_char(remains[index + 1], remains[index + 2]) == Some(b']')
+                    {
+                        key_end_index = index;
+                        index += 2;
+                        break;
+                    };
+                    index += 1;
+                }
                 _ => index += 1,
             }
+            key_end_index = index;
         }
 
         if index + 1 < remains.len() && remains[index + 1] == b'[' {
-            Some(Self(&remains[..index], Some(&remains[index + 2..])))
+            Some(Self(&remains[..key_end_index], Some(&remains[index + 2..])))
+        } else if index + 3 < remains.len()
+            && remains[index + 1] == b'%'
+            && parse_char(remains[index + 2], remains[index + 3]) == Some(b'[')
+        {
+            Some(Self(&remains[..key_end_index], Some(&remains[index + 4..])))
         } else {
-            Some(Self(&remains[..index], None))
+            Some(Self(&remains[..key_end_index], None))
         }
     }
 
     fn has_subkey(&self) -> bool {
         match self.1 {
-            Some(bytes) => bytes.iter().any(|c| *c == b']'),
+            Some(remains) => {
+                let mut index = 0;
+                while index < remains.len() {
+                    match remains[index] {
+                        b']' => return true,
+                        b'%' => {
+                            // Percent encoded opening bracket
+                            if index + 2 < remains.len()
+                                && parse_char(remains[index + 1], remains[index + 2]) == Some(b']')
+                            {
+                                return true;
+                            };
+                            index += 1;
+                        }
+                        _ => index += 1,
+                    }
+                }
+                return false;
+            }
             None => false,
         }
     }
 
-    fn len(&self) -> usize {
+    fn is_empty(&self) -> bool {
         match self.1 {
-            Some(r) => r.len() + self.0.len() + 1,
-            None => self.0.len(),
+            Some(r) => self.0.is_empty() && r.is_empty(),
+            None => self.0.is_empty(),
         }
     }
 
@@ -72,9 +124,12 @@ impl<'a> Key<'a> {
 pub struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
-    fn parse(slice: &'a [u8]) -> Option<Self> {
-        if *slice.get(0)? == b'&' {
-            return None;
+    fn parse(slice: &'a [u8]) -> (Option<Self>, usize) {
+        match slice.get(0) {
+            Some(b'&') | None => {
+                return (None, 0);
+            }
+            _ => {}
         }
 
         let mut index = 1;
@@ -85,11 +140,7 @@ impl<'a> Value<'a> {
             }
         }
 
-        Some(Self(&slice[1..index]))
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
+        (Some(Self(&slice[1..index])), index)
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
@@ -105,18 +156,11 @@ impl<'a> Value<'a> {
 pub struct Pair<'a>(Key<'a>, Option<Value<'a>>);
 
 impl<'a> Pair<'a> {
-    fn parse(slice: &'a [u8]) -> Self {
-        let key = Key::parse(slice);
-        let value = Value::parse(&slice[key.len()..]);
+    fn parse(slice: &'a [u8]) -> (Self, usize) {
+        let (key, key_len) = Key::parse(slice);
+        let (value, value_len) = Value::parse(&slice[key_len..]);
 
-        Self(key, value)
-    }
-
-    fn len(&self) -> usize {
-        match &self.1 {
-            Some(v) => self.0.len() + v.len() + 2, // key + value + '=' + '&'
-            None => self.0.len() + 1,              // key + '&'
-        }
+        (Self(key, value), key_len + value_len + 1)
     }
 
     fn new(k: Key<'a>, v: Option<Value<'a>>) -> Pair<'a> {
@@ -136,8 +180,8 @@ impl<'a> BracketsQS<'a> {
         let mut index = 0;
 
         while index < slice.len() {
-            let pair = Pair::parse(&slice[index..]);
-            index += pair.len();
+            let (pair, pair_len) = Pair::parse(&slice[index..]);
+            index += pair_len;
 
             let decoded_key = pair.0.decode_to(&mut scratch);
 
@@ -245,7 +289,7 @@ mod de {
                 .into_iter()
                 .map(|pair| {
                     let index = match pair.0.subkey() {
-                        Some(subkey) if subkey.len() > 0 => lexical::parse::<usize, _>(subkey.0)
+                        Some(subkey) if !subkey.is_empty() => lexical::parse::<usize, _>(subkey.0)
                             .map_err(|e| {
                                 Error::new(ErrorKind::InvalidNumber)
                                     .message(format!("invalid index: {}", e))

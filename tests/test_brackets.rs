@@ -269,3 +269,19 @@ fn deserialize_maps_of_maps() {
         Ok(p!(map))
     );
 }
+
+#[test]
+fn deserialize_pencoded_brackets() {
+    let mut map = HashMap::new();
+    map.insert("a", 1);
+    map.insert("bb", 2);
+    map.insert("ccc", 3);
+
+    assert_eq!(
+        from_bytes(
+            b"value%5Ba%5D=1&value%5Bbb%5D=2&value%5Bccc%5D=3",
+            ParseMode::Brackets
+        ),
+        Ok(p!(map))
+    );
+}
