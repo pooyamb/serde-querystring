@@ -1,7 +1,5 @@
 //! These tests are common between different deserialization methods
 
-use std::collections::HashMap;
-
 use _serde::Deserialize;
 use serde_querystring::de::{from_bytes, Error, ErrorKind, ParseMode};
 
@@ -30,6 +28,17 @@ macro_rules! p {
     ($value:expr) => {
         Primitive::new($value)
     };
+}
+
+macro_rules! map {
+    () => {{
+        std::collections::HashMap::new()
+    }};
+    ($($k:expr => $v:expr),+ $(,)?) => {{
+        let mut map = std::collections::HashMap::new();
+        $(map.insert($k, $v);)+
+        map
+    }};
 }
 
 #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
@@ -75,11 +84,12 @@ fn deserialize_integer_valid() {
     assert_eq!(from_str("value=-9223372036854775808"), Ok(p!(i64::MIN)));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(-1337_i64, "value1");
-    map.insert(-7331_i64, "value2");
-    map.insert(1337_i64, "value3");
-    map.insert(7331_i64, "value4");
+    let map = map! {
+        -1337_i64 => "value1",
+        -7331_i64 => "value2",
+        1337_i64 => "value3",
+        7331_i64 => "value4"
+    };
     assert_eq!(
         from_bytes(
             b"-1337=value1&-7331=value2&1337=value3&7331=value4",
@@ -121,9 +131,10 @@ fn deserialize_bool() {
     assert_eq!(from_str("value=false"), Ok(p!(false)));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(true, "value1");
-    map.insert(false, "value2");
+    let map = map! {
+        true => "value1",
+        false => "value2"
+    };
     assert_eq!(
         from_bytes(b"true=value1&off=value2", ParseMode::UrlEncoded),
         Ok(map)
@@ -140,9 +151,10 @@ fn deserialize_str() {
     assert_eq!(from_str("value=-25"), Ok(p!("-25")));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert("some", "value1");
-    map.insert("bytes", "value2");
+    let map = map! {
+        "some" => "value1",
+        "bytes" => "value2"
+    };
     assert_eq!(
         from_bytes(b"some=value1&bytes=value2", ParseMode::UrlEncoded),
         Ok(map)
@@ -163,9 +175,10 @@ fn deserialize_strings() {
     assert_eq!(from_str("value=rum+rum"), Ok(p!("rum rum".to_string())));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(String::from("some"), "value1");
-    map.insert(String::from("st ri ng"), "value2");
+    let map = map! {
+        String::from("some") => "value1",
+        String::from("st ri ng") => "value2"
+    };
     assert_eq!(
         from_bytes(b"some=value1&st+ri+ng=value2", ParseMode::UrlEncoded),
         Ok(map)
@@ -174,25 +187,19 @@ fn deserialize_strings() {
 
 #[test]
 fn deserialize_bytes() {
-    assert_eq!(
-        from_str("value=test"),
-        Ok(p!(serde_bytes::Bytes::new(b"test")))
-    );
+    use serde_bytes::Bytes;
+
+    assert_eq!(from_str("value=test"), Ok(p!(Bytes::new(b"test"))));
 
     // We don't make assumptions about numbers
-    assert_eq!(
-        from_str("value=250"),
-        Ok(p!(serde_bytes::Bytes::new(b"250")))
-    );
-    assert_eq!(
-        from_str("value=-25"),
-        Ok(p!(serde_bytes::Bytes::new(b"-25")))
-    );
+    assert_eq!(from_str("value=250"), Ok(p!(Bytes::new(b"250"))));
+    assert_eq!(from_str("value=-25"), Ok(p!(Bytes::new(b"-25"))));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(serde_bytes::Bytes::new(b"some"), "value1");
-    map.insert(serde_bytes::Bytes::new(b"bytes"), "value2");
+    let map = map! {
+        Bytes::new(b"some") => "value1",
+        Bytes::new(b"bytes") => "value2"
+    };
     assert_eq!(
         from_bytes(b"some=value1&bytes=value2", ParseMode::UrlEncoded),
         Ok(map)
@@ -201,27 +208,24 @@ fn deserialize_bytes() {
 
 #[test]
 fn deserialize_byte_vecs() {
-    assert_eq!(
-        from_str("value=foo"),
-        Ok(p!(serde_bytes::ByteBuf::from("foo")))
-    );
+    use serde_bytes::ByteBuf;
+
+    assert_eq!(from_str("value=foo"), Ok(p!(ByteBuf::from("foo"))));
 
     // percent decoded
     assert_eq!(
         from_str("value=%D8%A8%D8%A7%D8%A8%D8%A7%D8%A8%D8%B2%D8%B1%DA%AF"),
-        Ok(p!(serde_bytes::ByteBuf::from("بابابزرگ")))
+        Ok(p!(ByteBuf::from("بابابزرگ")))
     );
 
     // Plus in strings should be replaced with space
-    assert_eq!(
-        from_str("value=rum+rum"),
-        Ok(p!(serde_bytes::ByteBuf::from("rum rum")))
-    );
+    assert_eq!(from_str("value=rum+rum"), Ok(p!(ByteBuf::from("rum rum"))));
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(serde_bytes::ByteBuf::from("some"), "value1");
-    map.insert(serde_bytes::ByteBuf::from("by\0te s"), "value2");
+    let map = map! {
+        ByteBuf::from("some") => "value1",
+        ByteBuf::from("by\0te s") => "value2"
+    };
     assert_eq!(
         from_bytes(b"some=value1&by%00te+s=value2", ParseMode::UrlEncoded),
         Ok(map)
@@ -247,9 +251,10 @@ fn deserialize_unit_enum() {
     );
 
     // In keys
-    let mut map = HashMap::new();
-    map.insert(Side::God, "winner");
-    map.insert(Side::Right, "looser");
+    let map = map! {
+        Side::God => "winner",
+        Side::Right => "looser"
+    };
     assert_eq!(
         from_bytes(b"God=winner&Right=looser", ParseMode::UrlEncoded),
         Ok(map)

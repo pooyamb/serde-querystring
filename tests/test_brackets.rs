@@ -1,7 +1,5 @@
 //! These tests are meant for the `BracketsQS` method
 
-use std::collections::HashMap;
-
 use _serde::Deserialize;
 use serde_querystring::de::{from_bytes, ParseMode};
 
@@ -26,6 +24,17 @@ macro_rules! p {
     ($value:expr) => {
         Primitive::new($value)
     };
+}
+
+macro_rules! map {
+    () => {{
+        std::collections::HashMap::new()
+    }};
+    ($($k:expr => $v:expr),+ $(,)?) => {{
+        let mut map = std::collections::HashMap::new();
+        $(map.insert($k, $v);)+
+        map
+    }};
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -120,9 +129,10 @@ fn deserialize_unit_enums() {
     }
 
     // unit enums as map keys
-    let mut map = HashMap::new();
-    map.insert(Side::God, "winner");
-    map.insert(Side::Right, "looser");
+    let map = map! {
+        Side::God => "winner",
+        Side::Right => "looser",
+    };
     assert_eq!(
         from_bytes(b"God=winner&Right=looser", ParseMode::Brackets),
         Ok(map)
@@ -259,10 +269,11 @@ fn deserialize_decoded_keys() {
 
 #[test]
 fn deserialize_maps_of_maps() {
-    let mut map = HashMap::new();
-    map.insert("a", 1);
-    map.insert("b", 2);
-    map.insert("c", 3);
+    let map = map! {
+        "a" => 1,
+        "b" => 2,
+        "c" => 3,
+    };
 
     assert_eq!(
         from_bytes(b"value[a]=1&value[b]=2&value[c]=3", ParseMode::Brackets),
@@ -272,10 +283,11 @@ fn deserialize_maps_of_maps() {
 
 #[test]
 fn deserialize_pencoded_brackets() {
-    let mut map = HashMap::new();
-    map.insert("a", 1);
-    map.insert("bb", 2);
-    map.insert("ccc", 3);
+    let map = map! {
+        "a" => 1,
+        "bb" => 2,
+        "ccc" => 3,
+    };
 
     assert_eq!(
         from_bytes(
