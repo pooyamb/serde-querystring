@@ -408,12 +408,25 @@ mod de {
             visitor.visit_enum(self)
         }
 
+        fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: de::Visitor<'de>,
+        {
+            if self.0.is_empty() {
+                visitor.visit_none()
+            } else if self.0.len() == 1 && !self.0[0].0.has_subkey() && self.0[0].1.is_none() {
+                visitor.visit_none()
+            } else {
+                visitor.visit_some(self)
+            }
+        }
+
         forware_to_slice_deserializer! {
             deserialize_i8, deserialize_i16, deserialize_i32, deserialize_i64, deserialize_i128,
             deserialize_u8, deserialize_u16, deserialize_u32, deserialize_u64, deserialize_u128,
             deserialize_f32, deserialize_f64,
             deserialize_char, deserialize_str, deserialize_string, deserialize_identifier,
-            deserialize_bool, deserialize_bytes, deserialize_byte_buf, deserialize_option, deserialize_unit,
+            deserialize_bool, deserialize_bytes, deserialize_byte_buf, deserialize_unit,
             deserialize_any, deserialize_ignored_any,
         }
 

@@ -351,3 +351,41 @@ fn deserialize_invalid_brackets() {
         Ok(map)
     );
 }
+
+#[test]
+fn deserialize_option() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
+    struct Child {
+        age: usize,
+        height: usize,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
+    struct Parent {
+        child1: Option<Child>,
+        child2: Option<Child>,
+        child3: Option<Child>,
+    }
+
+    let expected = Parent {
+        child1: Some(Child {
+            age: 10,
+            height: 140,
+        }),
+        child2: Some(Child {
+            age: 20,
+            height: 190,
+        }),
+        child3: None,
+    };
+
+    assert_eq!(
+        from_bytes(
+            b"child1[age]=10&child1[height]=140&child2[age]=20&child2[height]=190",
+            ParseMode::Brackets
+        ),
+        Ok(expected)
+    );
+}
