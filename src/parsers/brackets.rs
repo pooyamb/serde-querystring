@@ -2,8 +2,8 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, parse_char, Reference};
 
-#[derive(Default, Clone, Copy)]
-pub struct Key<'a>(&'a [u8], Option<&'a [u8]>);
+#[derive(Clone, Copy)]
+struct Key<'a>(&'a [u8], Option<&'a [u8]>);
 
 impl<'a> Key<'a> {
     fn parse(slice: &'a [u8]) -> (Self, usize) {
@@ -121,7 +121,7 @@ impl<'a> Key<'a> {
 }
 
 #[derive(Default, Clone, Copy)]
-pub struct Value<'a>(&'a [u8]);
+struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> (Option<Self>, usize) {
@@ -147,13 +147,13 @@ impl<'a> Value<'a> {
         parse_bytes(self.0, scratch)
     }
 
-    pub fn slice(&self) -> &'a [u8] {
+    fn slice(&self) -> &'a [u8] {
         self.0
     }
 }
 
-#[derive(Default, Clone, Copy)]
-pub struct Pair<'a>(Key<'a>, Option<Value<'a>>);
+#[derive(Clone, Copy)]
+struct Pair<'a>(Key<'a>, Option<Value<'a>>);
 
 impl<'a> Pair<'a> {
     fn parse(slice: &'a [u8]) -> (Self, usize) {
@@ -174,7 +174,7 @@ pub struct BracketsQS<'a> {
 
 impl<'a> BracketsQS<'a> {
     pub fn parse(slice: &'a [u8]) -> Self {
-        let mut pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>> = BTreeMap::new();
+        let mut pairs: BTreeMap<_, Vec<Pair<'a>>> = BTreeMap::new();
         let mut scratch = Vec::new();
 
         let mut index = 0;
@@ -195,11 +195,11 @@ impl<'a> BracketsQS<'a> {
         Self { pairs }
     }
 
-    pub fn from_pairs<I>(iter: I) -> Self
+    fn from_pairs<I>(iter: I) -> Self
     where
         I: Iterator<Item = Pair<'a>>,
     {
-        let mut pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>> = BTreeMap::new();
+        let mut pairs: BTreeMap<_, Vec<Pair<'a>>> = BTreeMap::new();
 
         let mut scratch = Vec::new();
         let subpairs = iter.filter_map(|p| Some((p.0.subkey()?, p.1)));
