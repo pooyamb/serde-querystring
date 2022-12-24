@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
       alt="docs.rs docs" />
   </a>
-  <img src="https://img.shields.io/github/workflow/status/pooyamb/serde-querystring/Test?style=flat-square" alt="actions status" />
+  <img src="https://img.shields.io/github/actions/workflow/status/pooyamb/serde-querystring/test.yml?style=flat-square" alt="actions status" />
   <img alt="Crates.io license" src="https://img.shields.io/crates/l/serde-querystring?style=flat-square">
 </div>
 
