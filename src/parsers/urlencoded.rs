@@ -72,11 +72,35 @@ impl<'a> Pair<'a> {
     }
 }
 
+/// The simplest parser for querystring
+/// It parses the whole querystring, and overwrites each repeated key's value.
+/// it doesn't vectors, maps nor tuples, but provides the best performance.
+///
+/// ## Note
+/// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
+/// call the `value` method for their keys.
+///
+/// ## Example
+/// ```rust
+///# use std::borrow::Cow;
+/// use serde_querystring::UrlEncodedQS;
+///
+/// let slice = b"key=value";
+///
+/// let parser = UrlEncodedQS::parse(slice);
+///
+/// assert_eq!(parser.keys(), vec![&Cow::Borrowed(b"key")]);
+/// assert_eq!(
+///     parser.value(b"key"),
+///     Some(Some(Cow::Borrowed("value".as_bytes())))
+/// );
+/// ```
 pub struct UrlEncodedQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>>,
 }
 
 impl<'a> UrlEncodedQS<'a> {
+    /// Parse a slice of bytes into a `UrlEncodedQS`
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -99,14 +123,18 @@ impl<'a> UrlEncodedQS<'a> {
         Self { pairs }
     }
 
-    /// Returns a vector containing all the keys in querystring
+    /// Returns a vector containing all the keys in querystring.
     pub fn keys(&self) -> Vec<&Cow<'a, [u8]>> {
         self.pairs.keys().collect()
     }
 
-    /// Returns the last value assigned to a key
-    /// It will return None if the key didn't exist in the querystring
-    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
+    /// Returns the last value assigned to a key.
+    ///
+    /// It returns `None` if the **key doesn't exist** in the querystring,
+    /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
         self.pairs

@@ -168,11 +168,53 @@ impl<'a> Pair<'a> {
     }
 }
 
+/// A querystring parser with support for vectors/lists, maps and enums(for serde)
+/// by the use of brackets(like qs or PHP).
+///
+/// ## Note
+/// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
+/// call the `value` method for their keys.
+/// Sub keys/Sub values(The part of the key after bracket opening) is visited when calling the `sub_values`
+/// method, to limit unnecessary allocations and parsing(and stack overflows from too many levels).
+///
+/// ## Example
+/// ```rust
+///# use std::borrow::Cow;
+/// use serde_querystring::BracketsQS;
+///
+/// let slice = b"foo[bar]=baz&foo[bar]=buzz&foo[foobar]=qux&foo=bar";
+/// let parser = BracketsQS::parse(slice);
+///
+/// // `values` method returns ALL the direct values as a vector.
+/// assert_eq!(
+///     parser.values(b"foo"),
+///     Some(vec![Some("bar".as_bytes().into())])
+/// );
+///
+/// // `sub_values` method can be used for maps and optionally returns a new `BracketsQS` struct
+/// let foo_values = parser.sub_values(b"foo");
+/// assert!(foo_values.is_some());
+///
+/// let foo_values = foo_values.unwrap();
+/// assert_eq!(
+///     foo_values.values(b"bar"),
+///     Some(vec![
+///         Some("baz".as_bytes().into()),
+///         Some("buzz".as_bytes().into())
+///     ])
+/// );
+///
+/// assert_eq!(
+///     foo_values.values(b"foobar"),
+///     Some(vec![Some("qux".as_bytes().into())])
+/// )
+/// ```
 pub struct BracketsQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>>,
 }
 
 impl<'a> BracketsQS<'a> {
+    /// Parse a slice of bytes into a `BracketsQS`
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs: BTreeMap<_, Vec<Pair<'a>>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -218,14 +260,23 @@ impl<'a> BracketsQS<'a> {
         Self { pairs }
     }
 
+    /// Returns a vector containing all the keys in querystring.
     pub fn keys(&self) -> Vec<&Cow<'a, [u8]>> {
         self.pairs.keys().collect()
     }
 
+    /// Parses all the subkeys for this key and optionally returns a new 'BracketsQS' if the key exists
     pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQS> {
         Some(Self::from_pairs(self.pairs.get(key)?.iter().copied()))
     }
 
+    /// Returns a vector containing all the values assigned to a key.
+    ///
+    /// It returns None if the **key doesn't exist** in the querystring,
+    /// the resulting vector may contain None if the **key had assignments without a value**, ex `&key&`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn values(&self, key: &'a [u8]) -> Option<Vec<Option<Cow<'a, [u8]>>>> {
         let mut scratch = Vec::new();
 
@@ -239,6 +290,13 @@ impl<'a> BracketsQS<'a> {
         )
     }
 
+    /// Returns the last direct value assigned to a key.
+    ///
+    /// It returns `None` if the **key doesn't exist** in the querystring,
+    /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
 

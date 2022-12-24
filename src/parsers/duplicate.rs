@@ -76,11 +76,41 @@ impl<'a> Pair<'a> {
     }
 }
 
+/// A querystring parser with support for vectors/lists of values by repeating keys.
+///
+/// ## Note
+/// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
+/// call the `value` method for their keys.
+///
+/// ## Example
+/// ```rust
+///# use std::borrow::Cow;
+/// use serde_querystring::DuplicateQS;
+///
+/// let slice = b"foo=bar&foo=baz&foo&foo=";
+///
+/// let parser = DuplicateQS::parse(slice);
+///
+/// // `values` method returns ALL the values as a vector.
+/// assert_eq!(
+///    parser.values(b"foo"),
+///    Some(vec![
+///        Some("bar".as_bytes().into()),
+///        Some("baz".as_bytes().into()),
+///        None,
+///        Some("".as_bytes().into())
+///    ])
+///);
+///
+/// // `value` method returns the last seen value
+/// assert_eq!(parser.value(b"foo"), Some(Some("".as_bytes().into())));
+/// ```
 pub struct DuplicateQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>>,
 }
 
 impl<'a> DuplicateQS<'a> {
+    /// Parse a slice of bytes into a `DuplicateQS`
     pub fn parse(slice: &'a [u8]) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Vec<Pair<'a>>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -103,13 +133,18 @@ impl<'a> DuplicateQS<'a> {
         Self { pairs }
     }
 
+    /// Returns a vector containing all the keys in querystring.
     pub fn keys(&self) -> Vec<&Cow<'a, [u8]>> {
         self.pairs.keys().collect()
     }
 
-    /// Returns a vector containing all the values assigned to a key
-    /// It will return None if the key didn't exist in the querystring
-    /// Vector may contain None the key had assignments without a value, ex `&key&`
+    /// Returns a vector containing all the values assigned to a key.
+    ///
+    /// It returns None if the **key doesn't exist** in the querystring,
+    /// the resulting vector may contain None if the **key had assignments without a value**, ex `&key&`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn values(&self, key: &'a [u8]) -> Option<Vec<Option<Cow<'a, [u8]>>>> {
         let mut scratch = Vec::new();
 
@@ -122,9 +157,13 @@ impl<'a> DuplicateQS<'a> {
         )
     }
 
-    /// Returns the last value assigned to a key
-    /// It will return None if the key didn't exist in the querystring
-    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
+    /// Returns the last value assigned to a key.
+    ///
+    /// It returns `None` if the **key doesn't exist** in the querystring,
+    /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
 
@@ -167,7 +206,7 @@ mod de {
         }
     }
 
-    pub struct DuplicateValueIter<I>(I);
+    pub(crate) struct DuplicateValueIter<I>(I);
 
     impl<'a, I> IntoRawSlices<'a> for DuplicateValueIter<I>
     where

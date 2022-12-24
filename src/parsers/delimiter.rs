@@ -87,12 +87,41 @@ impl<'a> Pair<'a> {
     }
 }
 
+/// A querystring parser with support for vectors/lists of values by the use of a delimiter(ex: `|`).
+///
+/// ## Note
+/// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
+/// call the `value` method for their keys.
+///
+/// ## Example
+/// ```rust
+///# use std::borrow::Cow;
+/// use serde_querystring::DelimiterQS;
+///
+/// let slice = b"foo=bar|baz||";
+/// let parser = DelimiterQS::parse(slice, b'|');
+///
+/// // `values` method returns ALL the values as a vector.
+/// assert_eq!(
+///     parser.values(b"foo"),
+///     Some(Some(vec![
+///         "bar".as_bytes().into(),
+///         "baz".as_bytes().into(),
+///         "".as_bytes().into(),
+///         "".as_bytes().into()
+///     ]))
+/// );
+///
+/// // `value` method returns the whole slice as the value without parsing by delimiter.
+/// assert_eq!(parser.value(b"foo"), Some(Some("bar|baz||".as_bytes().into())));
+/// ```
 pub struct DelimiterQS<'a> {
     pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>>,
     delimiter: u8,
 }
 
 impl<'a> DelimiterQS<'a> {
+    /// Parse a slice of bytes into a `DelimiterQS`
     pub fn parse(slice: &'a [u8], delimiter: u8) -> Self {
         let mut pairs: BTreeMap<Cow<'a, [u8]>, Pair<'a>> = BTreeMap::new();
         let mut scratch = Vec::new();
@@ -115,13 +144,18 @@ impl<'a> DelimiterQS<'a> {
         Self { pairs, delimiter }
     }
 
+    /// Returns a vector containing all the keys in querystring.
     pub fn keys(&self) -> Vec<&Cow<'a, [u8]>> {
         self.pairs.keys().collect()
     }
 
-    /// Returns the values assigned to a key(only the last assignment) parsed using delimiter
-    /// It will return None if the key didn't exist in the querystring
-    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
+    /// Returns the values assigned to a key(only the last assignment) parsed using delimiter.
+    ///
+    /// It returns `None` if the **key doesn't exist** in the querystring,
+    /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn values(&self, key: &'a [u8]) -> Option<Option<Vec<Cow<'a, [u8]>>>> {
         let delimiter = self.delimiter;
         let mut scratch = Vec::new();
@@ -135,8 +169,12 @@ impl<'a> DelimiterQS<'a> {
     }
 
     /// Returns the last value assigned to a key without taking delimiters into account
-    /// It will return None if the key didn't exist in the querystring
-    /// It will return Some(None) if the last assignment to a key didn't have a value, ex `&key&`
+    ///
+    /// It returns `None` if the **key doesn't exist** in the querystring,
+    /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
+    ///
+    /// ## Note
+    /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
 
@@ -170,7 +208,7 @@ mod de {
         }
     }
 
-    pub struct SeparatorValues<'a> {
+    pub(crate) struct SeparatorValues<'a> {
         slice: &'a [u8],
         delimiter: u8,
     }
