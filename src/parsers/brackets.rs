@@ -2,6 +2,17 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::decode::{parse_bytes, parse_char, Reference};
 
+/// A `Key` in brackets mode represents some state of a parsed key
+///
+/// At each state, the first field represents the current part of they key and
+/// the second field is the yet-to-be parsed part of the key.
+/// Each time the `sub_key` method is called, we move one step forward and return
+/// a new Key.
+///
+/// ## Example
+/// For this pair `key[key1][key2]=value`, the first Key would be (`key`, `key1][key2]`).
+/// the first time we call the `sub_key` method we get (`key1`, `key2]`).
+/// and by calling `sub_key` again on the result we get (`key2`, None)
 #[derive(Clone, Copy)]
 struct Key<'a>(&'a [u8], Option<&'a [u8]>);
 
@@ -115,7 +126,7 @@ impl<'a> Key<'a> {
         }
     }
 
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 }
@@ -143,7 +154,7 @@ impl<'a> Value<'a> {
         (Some(Self(&slice[1..index])), index)
     }
 
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 
@@ -156,6 +167,11 @@ impl<'a> Value<'a> {
 struct Pair<'a>(Key<'a>, Option<Value<'a>>);
 
 impl<'a> Pair<'a> {
+    /// Parses a pair of key-value and return a `Pair` and a skip len
+    ///
+    /// Unlike other parser methods, we directly return the skip_len here
+    /// since there are many exceptions to take into account in this method
+    /// and it helps avoid some recalculations.
     fn parse(slice: &'a [u8]) -> (Self, usize) {
         let (key, key_len) = Key::parse(slice);
         let (value, value_len) = Value::parse(&slice[key_len..]);
@@ -225,7 +241,7 @@ impl<'a> BracketsQS<'a> {
             let (pair, pair_len) = Pair::parse(&slice[index..]);
             index += pair_len;
 
-            let decoded_key = pair.0.decode_to(&mut scratch);
+            let decoded_key = pair.0.decode(&mut scratch);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
                 values.push(pair);
@@ -247,7 +263,7 @@ impl<'a> BracketsQS<'a> {
         let subpairs = iter.filter_map(|p| Some((p.0.subkey()?, p.1)));
 
         for (k, v) in subpairs {
-            let decoded_key = k.decode_to(&mut scratch);
+            let decoded_key = k.decode(&mut scratch);
             let pair = Pair::new(k, v);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
@@ -285,7 +301,7 @@ impl<'a> BracketsQS<'a> {
                 .get(key)?
                 .iter()
                 .filter(|p| !p.0.has_subkey())
-                .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
+                .map(|p| p.1.as_ref().map(|v| v.decode(&mut scratch).into_cow()))
                 .collect(),
         )
     }
@@ -305,7 +321,7 @@ impl<'a> BracketsQS<'a> {
             .iter()
             .filter(|p| !p.0.has_subkey())
             .last()
-            .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
+            .map(|p| p.1.as_ref().map(|v| v.decode(&mut scratch).into_cow()))
     }
 }
 

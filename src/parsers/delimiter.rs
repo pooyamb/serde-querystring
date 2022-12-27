@@ -21,7 +21,7 @@ impl<'a> Key<'a> {
         self.0.len()
     }
 
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 }
@@ -29,7 +29,7 @@ impl<'a> Key<'a> {
 struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 }
@@ -79,7 +79,10 @@ impl<'a> Pair<'a> {
         Self(key, value)
     }
 
-    fn len(&self) -> usize {
+    /// It report how many chars we should move forward after this pair, to see a new one.
+    /// It might report invalid result at the end of the slice,
+    /// so calling site should check the validity of resulting index
+    fn skip_len(&self) -> usize {
         match &self.1 {
             Some(v) => self.0.len() + v.len() + 2,
             None => self.0.len() + 1,
@@ -130,9 +133,9 @@ impl<'a> DelimiterQS<'a> {
 
         while index < slice.len() {
             let pair = Pair::parse(&slice[index..]);
-            index += pair.len();
+            index += pair.skip_len();
 
-            let decoded_key = pair.0.decode_to(&mut scratch);
+            let decoded_key = pair.0.decode(&mut scratch);
 
             if let Some(old_pair) = pairs.get_mut(decoded_key.as_ref()) {
                 *old_pair = pair;
@@ -163,7 +166,7 @@ impl<'a> DelimiterQS<'a> {
         Some(self.pairs.get(key)?.1.as_ref().map(|values| {
             values
                 .values(delimiter)
-                .map(|v| v.decode_to(&mut scratch).into_cow())
+                .map(|v| v.decode(&mut scratch).into_cow())
                 .collect()
         }))
     }

@@ -21,7 +21,7 @@ impl<'a> Key<'a> {
         self.0.len()
     }
 
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 }
@@ -49,7 +49,7 @@ impl<'a> Value<'a> {
         self.0.len()
     }
 
-    fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
+    fn decode<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {
         parse_bytes(self.0, scratch)
     }
 
@@ -68,7 +68,10 @@ impl<'a> Pair<'a> {
         Self(key, value)
     }
 
-    fn len(&self) -> usize {
+    /// It report how many chars we should move forward after this pair, to see a new one.
+    /// It might report invalid result at the end of the slice,
+    /// so calling site should check the validity of resulting index
+    fn skip_len(&self) -> usize {
         match &self.1 {
             Some(v) => self.0.len() + v.len() + 2,
             None => self.0.len() + 1,
@@ -119,9 +122,9 @@ impl<'a> DuplicateQS<'a> {
 
         while index < slice.len() {
             let pair = Pair::parse(&slice[index..]);
-            index += pair.len();
+            index += pair.skip_len();
 
-            let decoded_key = pair.0.decode_to(&mut scratch);
+            let decoded_key = pair.0.decode(&mut scratch);
 
             if let Some(values) = pairs.get_mut(decoded_key.as_ref()) {
                 values.push(pair);
@@ -152,7 +155,7 @@ impl<'a> DuplicateQS<'a> {
             self.pairs
                 .get(key)?
                 .iter()
-                .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
+                .map(|p| p.1.as_ref().map(|v| v.decode(&mut scratch).into_cow()))
                 .collect(),
         )
     }
@@ -171,7 +174,7 @@ impl<'a> DuplicateQS<'a> {
             .get(key)?
             .iter()
             .last()
-            .map(|p| p.1.as_ref().map(|v| v.decode_to(&mut scratch).into_cow()))
+            .map(|p| p.1.as_ref().map(|v| v.decode(&mut scratch).into_cow()))
     }
 }
 
