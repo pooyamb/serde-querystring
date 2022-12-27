@@ -98,7 +98,7 @@ impl<'de> Value<'de> for ParsedSlice<'de> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Clone, Copy)]
 pub struct RawSlice<'de>(pub &'de [u8]);
 
 impl<'de> fmt::Display for RawSlice<'de> {
@@ -159,25 +159,7 @@ impl<'de> Value<'de> for RawSlice<'de> {
     }
 }
 
-#[derive(Debug)]
-pub struct OptionalRawSlice<'de>(pub Option<&'de [u8]>);
-
-impl<'de> OptionalRawSlice<'de> {
-    fn unwrap_or_default(&self) -> RawSlice<'de> {
-        RawSlice(self.0.unwrap_or_default())
-    }
-}
-
-impl<'de> fmt::Display for OptionalRawSlice<'de> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            Some(v) => f.write_str(&String::from_utf8_lossy(v)),
-            None => f.write_str("none"),
-        }
-    }
-}
-
-impl<'de> Value<'de> for OptionalRawSlice<'de> {
+impl<'de> Value<'de> for Option<RawSlice<'de>> {
     fn parse_number<'s, T>(&self, scratch: &'s mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical,
@@ -198,6 +180,6 @@ impl<'de> Value<'de> for OptionalRawSlice<'de> {
     }
 
     fn is_none(&self) -> bool {
-        self.0.map(|v| v.is_empty()).unwrap_or(self.0.is_none())
+        self.map(|v| v.0.is_empty()).unwrap_or(self.is_none())
     }
 }

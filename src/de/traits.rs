@@ -7,7 +7,7 @@ use crate::decode::Reference;
 
 use super::{
     error::{Error, ErrorKind},
-    slices::{OptionalRawSlice, ParsedSlice, RawSlice, Value},
+    slices::{ParsedSlice, RawSlice, Value},
 };
 
 pub trait IntoDeserializer<'de, 's> {
@@ -36,7 +36,7 @@ impl<'de, 's> IntoDeserializer<'de, 's> for RawSlice<'de> {
     }
 }
 
-impl<'de, 's> IntoDeserializer<'de, 's> for OptionalRawSlice<'de> {
+impl<'de, 's> IntoDeserializer<'de, 's> for Option<RawSlice<'de>> {
     type Deserializer = ValueDeserializer<'s, Self>;
 
     fn into_deserializer(self, scratch: &'s mut Vec<u8>) -> Self::Deserializer {

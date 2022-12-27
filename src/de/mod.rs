@@ -7,7 +7,7 @@ use _serde::{de, forward_to_deserialize_any};
 pub use error::{Error, ErrorKind};
 
 pub(crate) mod __implementors {
-    pub(crate) use super::slices::{OptionalRawSlice, ParsedSlice, RawSlice};
+    pub(crate) use super::slices::{ParsedSlice, RawSlice};
     pub(crate) use super::traits::{IntoDeserializer, IntoRawSlices};
 }
 
