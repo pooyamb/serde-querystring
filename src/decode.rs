@@ -1,11 +1,12 @@
 use std::borrow::{Borrow, Cow};
 
+/// Parses a single percent encoded char
 #[inline]
 pub fn parse_char(h: u8, l: u8) -> Option<u8> {
     Some(char::from(h).to_digit(16)? as u8 * 0x10 + char::from(l).to_digit(16)? as u8)
 }
 
-/// Decode a slice to the scratch or directly return the slice if not encoded
+/// Decodes a slice and return a Reference pointer
 pub fn parse_bytes<'de, 's>(
     slice: &'de [u8],
     scratch: &'s mut Vec<u8>,
@@ -61,6 +62,10 @@ pub fn parse_bytes<'de, 's>(
     }
 }
 
+/// A struct that can hold an owned or borrowed value
+///
+/// The difference between `Reference` and `Cow` is that it can contain a reference
+/// to either a slice present in the input(Borrowed), or a slice(decoded) present in the scratch(Copied)
 pub enum Reference<'b, 'c, T>
 where
     T: ?Sized + 'static + ToOwned,

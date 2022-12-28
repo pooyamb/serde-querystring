@@ -150,17 +150,17 @@ impl<'a> UrlEncodedQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::__implementors::{ParsedSlice, RawSlice};
+    use crate::de::__implementors::{DecodedSlice, RawSlice};
 
     use super::UrlEncodedQS;
 
     impl<'a> UrlEncodedQS<'a> {
         pub(crate) fn into_iter(
             self,
-        ) -> impl Iterator<Item = (ParsedSlice<'a>, Option<RawSlice<'a>>)> {
+        ) -> impl Iterator<Item = (DecodedSlice<'a>, Option<RawSlice<'a>>)> {
             self.pairs
                 .into_iter()
-                .map(|(key, pair)| (ParsedSlice(key), pair.1.map(|v| RawSlice(v.0))))
+                .map(|(key, pair)| (DecodedSlice(key), pair.1.map(|v| RawSlice(v.0))))
         }
     }
 }

@@ -182,7 +182,7 @@ impl<'a> DuplicateQS<'a> {
 mod de {
     use crate::de::{
         Error, ErrorKind,
-        __implementors::{IntoRawSlices, ParsedSlice, RawSlice},
+        __implementors::{DecodedSlice, IntoRawSlices, RawSlice},
     };
 
     use super::DuplicateQS;
@@ -192,13 +192,13 @@ mod de {
             self,
         ) -> impl Iterator<
             Item = (
-                ParsedSlice<'a>,
+                DecodedSlice<'a>,
                 DuplicateValueIter<impl Iterator<Item = RawSlice<'a>>>,
             ),
         > {
             self.pairs.into_iter().map(|(key, pairs)| {
                 (
-                    ParsedSlice(key),
+                    DecodedSlice(key),
                     DuplicateValueIter(
                         pairs
                             .into_iter()

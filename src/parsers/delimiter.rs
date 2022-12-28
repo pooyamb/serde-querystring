@@ -193,18 +193,18 @@ impl<'a> DelimiterQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::__implementors::{IntoRawSlices, ParsedSlice, RawSlice};
+    use crate::de::__implementors::{DecodedSlice, IntoRawSlices, RawSlice};
 
     use super::DelimiterQS;
 
     impl<'a> DelimiterQS<'a> {
         pub(crate) fn into_iter(
             self,
-        ) -> impl Iterator<Item = (ParsedSlice<'a>, SeparatorValues<'a>)> {
+        ) -> impl Iterator<Item = (DecodedSlice<'a>, SeparatorValues<'a>)> {
             let delimiter = self.delimiter;
             self.pairs.into_iter().map(move |(key, pair)| {
                 (
-                    ParsedSlice(key),
+                    DecodedSlice(key),
                     SeparatorValues::from_slice(pair.1.map(|v| v.0).unwrap_or_default(), delimiter),
                 )
             })

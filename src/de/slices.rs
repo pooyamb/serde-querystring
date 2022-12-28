@@ -31,16 +31,17 @@ fn invalid_boolean_error(slice: &[u8]) -> Error {
     )
 }
 
+/// Holds a slice of bytes that is already percent decoded
 #[derive(Debug)]
-pub struct ParsedSlice<'de>(pub Cow<'de, [u8]>);
+pub struct DecodedSlice<'de>(pub Cow<'de, [u8]>);
 
-impl<'de> fmt::Display for ParsedSlice<'de> {
+impl<'de> fmt::Display for DecodedSlice<'de> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&String::from_utf8_lossy(&self.0))
     }
 }
 
-impl<'de> Value<'de> for ParsedSlice<'de> {
+impl<'de> Value<'de> for DecodedSlice<'de> {
     fn parse_number<'s, T>(&self, _: &'s mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical,
@@ -98,6 +99,7 @@ impl<'de> Value<'de> for ParsedSlice<'de> {
     }
 }
 
+/// Holds a slice of bytes that is not percent decoded yet
 #[derive(Default, Clone, Copy)]
 pub struct RawSlice<'de>(pub &'de [u8]);
 

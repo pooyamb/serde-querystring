@@ -331,7 +331,7 @@ mod de {
 
     use crate::de::{
         Error, ErrorKind,
-        __implementors::{IntoDeserializer, ParsedSlice, RawSlice},
+        __implementors::{DecodedSlice, IntoDeserializer, RawSlice},
     };
 
     use super::{BracketsQS, Pair};
@@ -339,10 +339,10 @@ mod de {
     pub struct Pairs<'a>(Vec<Pair<'a>>);
 
     impl<'a> BracketsQS<'a> {
-        pub(crate) fn into_iter(self) -> impl Iterator<Item = (ParsedSlice<'a>, Pairs<'a>)> {
+        pub(crate) fn into_iter(self) -> impl Iterator<Item = (DecodedSlice<'a>, Pairs<'a>)> {
             self.pairs
                 .into_iter()
-                .map(|(key, pairs)| (ParsedSlice(key), Pairs(pairs)))
+                .map(|(key, pairs)| (DecodedSlice(key), Pairs(pairs)))
         }
     }
 
@@ -600,7 +600,7 @@ mod de {
 
     struct PairsMapDeserializer<'de, 's, I>
     where
-        I: Iterator<Item = (ParsedSlice<'de>, Pairs<'de>)>,
+        I: Iterator<Item = (DecodedSlice<'de>, Pairs<'de>)>,
     {
         iter: I,
         scratch: &'s mut Vec<u8>,
@@ -609,7 +609,7 @@ mod de {
 
     impl<'de, 's, I> de::MapAccess<'de> for PairsMapDeserializer<'de, 's, I>
     where
-        I: Iterator<Item = (ParsedSlice<'de>, Pairs<'de>)>,
+        I: Iterator<Item = (DecodedSlice<'de>, Pairs<'de>)>,
     {
         type Error = Error;
 
