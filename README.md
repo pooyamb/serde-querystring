@@ -11,6 +11,7 @@
       alt="docs.rs docs" />
   </a>
   <img src="https://img.shields.io/github/actions/workflow/status/pooyamb/serde-querystring/test.yml?style=flat-square" alt="actions status" />
+  <img alt="Codecov" src="https://img.shields.io/codecov/c/github/pooyamb/serde-querystring?style=flat-square">
   <img alt="Crates.io license" src="https://img.shields.io/crates/l/serde-querystring?style=flat-square">
 </div>
 
