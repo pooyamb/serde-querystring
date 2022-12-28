@@ -23,7 +23,7 @@ A query string parser for rust with support for different parsing methods.
 ```toml
 # Cargo.toml
 [dependencies]
-serde-querystring = "0.1.0-beta.3"
+serde-querystring = "0.1.0"
 ```
 
 ## Usage
@@ -53,7 +53,7 @@ Simply parses key=value pairs, accepting only one value per key. In case a key i
 
 ### `DuplicateQS` or `ParseMode::Duplicate`
 
-Just like UrlEncoded mode, except that if a key is repeated, we collect all the values for that key.
+Just like UrlEncoded mode, except that if a key is repeated, we collect ALL the values for that key which can be collected later as a vector.
 
 ### `DelimiterQS` or `ParseMode::Delimiter`
 
