@@ -298,7 +298,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.into_slice_deserializer().deserialize_option(visitor)
+        visitor.visit_some(self)
     }
 
     #[inline]

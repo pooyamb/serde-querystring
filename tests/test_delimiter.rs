@@ -115,6 +115,26 @@ fn deserialize_sequence() {
     );
 }
 
+#[test]
+fn deserialize_optional_seq() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
+    struct OptionalSeq {
+        seq: Option<Vec<u32>>,
+    }
+
+    assert_eq!(
+        from_bytes(b"key=value", ParseMode::Delimiter(b'|')),
+        Ok(OptionalSeq { seq: None })
+    );
+    assert_eq!(
+        from_bytes(b"seq=20|30|40", ParseMode::Delimiter(b'|')),
+        Ok(OptionalSeq {
+            seq: Some(vec![20, 30, 40])
+        })
+    );
+}
+
 /// Check if unit enums work as keys and values
 #[test]
 fn deserialize_unit_enums() {

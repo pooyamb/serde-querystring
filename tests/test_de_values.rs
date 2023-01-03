@@ -264,8 +264,9 @@ fn deserialize_unit_enum() {
 #[test]
 fn deserialize_option() {
     assert_eq!(from_str("value=1337"), Ok(p!(Some(1337), Option<u32>)));
-    assert_eq!(from_str("value="), Ok(p!(None, Option<u32>)));
-    assert_eq!(from_str("value=1337&value="), Ok(p!(None, Option<u32>)));
+
+    assert!(from_str::<Primitive<Option<u32>>>("value=").is_err());
+    assert!(from_str::<Primitive<Option<u32>>>("value=1337&value=").is_err());
 }
 
 #[test]
@@ -292,12 +293,9 @@ fn deserialize_no_value() {
     assert_eq!(from_str("value="), Ok(p!("")));
     assert_eq!(from_str("value="), Ok(p!(true)));
 
-    assert_eq!(from_str("value"), Ok(p!(None, Option<i32>)));
-    assert_eq!(from_str("value="), Ok(p!(None, Option<i32>)));
-
     // We could see this as an empty string too, but to keep it the same as
     // other types, we go with None
-    assert_eq!(from_str("value="), Ok(p!(None, Option<&str>)));
+    assert_eq!(from_str("value="), Ok(p!(Some(""), Option<&str>)));
 }
 
 #[test]

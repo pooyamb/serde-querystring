@@ -182,6 +182,6 @@ impl<'de> Value<'de> for Option<RawSlice<'de>> {
     }
 
     fn is_none(&self) -> bool {
-        self.map(|v| v.0.is_empty()).unwrap_or(self.is_none())
+        self.is_none()
     }
 }

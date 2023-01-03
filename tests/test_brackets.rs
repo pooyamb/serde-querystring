@@ -89,6 +89,26 @@ fn deserialize_sequence() {
 }
 
 #[test]
+fn deserialize_optional_seq() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(crate = "_serde")]
+    struct OptionalSeq {
+        seq: Option<Vec<u32>>,
+    }
+
+    assert_eq!(
+        from_bytes(b"key=value", ParseMode::Brackets),
+        Ok(OptionalSeq { seq: None })
+    );
+    assert_eq!(
+        from_bytes(b"seq=20&seq=30&seq=40", ParseMode::Brackets),
+        Ok(OptionalSeq {
+            seq: Some(vec![20, 30, 40])
+        })
+    );
+}
+
+#[test]
 fn deserialize_struct_value() {
     // vector
     assert_eq!(
