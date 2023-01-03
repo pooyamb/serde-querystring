@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "serde-querystring-actix"]
+members = [".", "serde-querystring-actix", "serde-querystring-axum"]
 
 [patch.crates-io]
 serde-querystring = { path = "." }

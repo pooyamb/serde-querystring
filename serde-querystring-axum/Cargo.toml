@@ -1,0 +1,28 @@
+[package]
+authors = ["Pouya M. B. <pooyamb@gmail.com>"]
+categories = ["encoding", "web-programming"]
+description = "A query string extractor for axum based on serde-querystring"
+documentation = "https://docs.rs/serde-querystring-axum"
+edition = "2018"
+keywords = ["serialization", "deserialization", "querystring", "serde", "axum"]
+license = "MIT OR Apache-2.0"
+name = "serde-querystring-axum"
+readme = "README.md"
+repository = "https://github.com/pooyamb/serde-querystring/"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum-core = "0.3.0"
+
+async-trait = "0.1"
+http = "0.2"
+
+serde = { version = "1.0.126", features = ["derive"] }
+serde-querystring = { version = "0.1.0", features = ["serde"] }
+
+[dev-dependencies]
+axum = "0.6"
+tokio = { version = "1.23", features = ["full"] }
+tower = "0.4"
