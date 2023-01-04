@@ -52,10 +52,8 @@ pub use serde_querystring::de::ParseMode;
 /// To change the default error and the parsing mode, add `QueryStringConfig` to your extensions.
 ///
 /// ```rust,no_run
-/// use axum::{
-///     Router, Extension
-/// };
-/// use serde_querystring_axum::ParsingMode;
+/// use axum::{Router, Extension, http::StatusCode};
+/// use serde_querystring_axum::{ParseMode, QueryStringConfig, QueryStringError};
 ///
 /// let app = Router::new().layer(Extension(
 ///     QueryStringConfig::new().ehandler(|_err| {
@@ -65,6 +63,9 @@ pub use serde_querystring::de::ParseMode;
 ///         )
 ///     }),
 /// ));
+/// # async {
+/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # };
 /// ```
 ///
 #[derive(Debug, Clone, Copy, Default)]
