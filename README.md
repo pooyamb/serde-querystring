@@ -30,14 +30,14 @@ serde-querystring = "0.1.0"
 
 You can use the parsers provided in this crate directly, examples are available in each parser's tests.
 
-```rust
+```rust,ignore
 let parsed = DuplicateQS::parse(b"foo=bar&foo=baz");
 let values = parser.values(b"foo"); // Will give you a vector of b"bar" and b"baz"
 ```
 
 Or you can use serde(with `serde` feature, enabled by default)
 
-```rust
+```rust,ignore
 use serde_querystring::de;
 
 let parsed: MyStruct = de::from_str("foo=bar&foo=baz", de::ParseMode::Duplicate).unwrap();
