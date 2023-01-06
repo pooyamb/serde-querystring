@@ -32,36 +32,74 @@ You can use the parsers provided in this crate directly, examples are available 
 
 ```rust,ignore
 let parsed = DuplicateQS::parse(b"foo=bar&foo=baz");
-let values = parser.values(b"foo"); // Will give you a vector of b"bar" and b"baz"
+let values = parsed.values(b"foo"); // Will give you a vector of b"bar" and b"baz"
 ```
 
 Or you can use serde(with `serde` feature, enabled by default)
 
 ```rust,ignore
-use serde_querystring::de;
+use serde::Deserialize;
+use serde_querystring::{from_str, ParseMode};
 
-let parsed: MyStruct = de::from_str("foo=bar&foo=baz", de::ParseMode::Duplicate).unwrap();
+#[derive(Deserialize)]
+struct MyStruct{
+  foo: Vec<String> // Or (String, u32) tuple
+}
+
+let parsed: MyStruct = from_str("foo=bar&foo=2022", ParseMode::Duplicate).unwrap();
 ```
 
-There is also `serde-querystring-actix` crate to support `actix-web`. It provides `QueryString` extractor which works just like the actix-web's own web::Query but uses `serde-querystring` to deserialize.
+There are also crates for `actix_web`(`serde-querystring-actix`) and `axum`(`serde-querystring-axum`) which provide extractors for their frameworks and can be used without directly relying on the core crate.
 
 ## Parsers
 
-### `UrlEncodedQS` or `ParseMode::UrlEncoded`
+### Simple Mode
 
 Simply parses key=value pairs, accepting only one value per key. In case a key is repeated, we only collect the last value.
 
-### `DuplicateQS` or `ParseMode::Duplicate`
+```rust,ignore
+use serde_querystring::{UrlEncodedQS, ParseMode, from_str};
 
-Just like UrlEncoded mode, except that if a key is repeated, we collect ALL the values for that key which can be collected later as a vector.
+UrlEncodedQS::parse(b"key=value");
+// or
+let res: MyStruct = from_str("foo=bar&key=value", ParseMode::UrlEncoded).unwrap();
+```
 
-### `DelimiterQS` or `ParseMode::Delimiter`
+### Repeated key mode
 
-Uses a delimiter byte to parse multiple values from a slice of value, ex: `"key=value1|value2|value3"`
+Supports vectors or values by repeating a key.
 
-### `BracketsQS` or `ParseMode::Brackets`
+```rust,ignore
+use serde_querystring::{DuplicateQS, ParseMode, from_str};
 
-Works like the PHP querystring parser, using brackets and subkeys to assign values, ex: `"key[a]=value&key[b]=value"`
+DuplicateQS::parse(b"foo=bar&foo=bar2&foo=bar3");
+// or
+let res: MyStruct = from_str("foo=bar&foo=bar2&foo=bar3", ParseMode::Duplicate).unwrap();
+```
+
+### Delimiter mode
+
+Supports vectors or values by using a delimiter byte(ex. b'|').
+
+```rust,ignore
+use serde_querystring::{DelimiterQS, ParseMode, from_str};
+
+DelimiterQS::parse(b"foo=bar|bar2|bar3", b'|');
+// or
+let res: MyStruct = from_str("foo=bar|bar2|bar3", ParseMode::Delimiter(b'|')).unwrap();
+```
+
+### Brackets mode
+
+Supports vectors or values by using a brackets and subkeys.
+
+```rust,ignore
+use serde_querystring::{BracketsQS, ParseMode, from_str};
+
+BracketsQS::parse(b"foo[1]=bar&foo[2]=bar&foo[3]=bar");
+// or
+let res: MyStruct = from_str("foo[1]=bar&foo[2]=bar&foo[3]=bar", ParseMode::Brackets).unwrap();
+```
 
 ## Credit
 
