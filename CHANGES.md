@@ -3,7 +3,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.1] - 2022-12-28
+## [0.1.1]
+### Fixed
+- When having Option<Vec> or any sequence type as a struct field, deserialization failed.
+### Changed
+- in UrlEncoded mode, `key=` and `key` now cause deserialization error for Option<T> instead of giving `None`.
+- Reexport the `ParseMode`, `Error` and `ErrorKind` enum from crate's root when `serde` feature is active.
+
+## [0.1.0] - 2022-12-28
 ### Added
 - Added more docs and improved the error handling.
 ### Fixed
