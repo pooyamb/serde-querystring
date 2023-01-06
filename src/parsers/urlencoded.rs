@@ -79,13 +79,13 @@ impl<'a> Pair<'a> {
 
 /// The simplest parser for querystring
 /// It parses the whole querystring, and overwrites each repeated key's value.
-/// it doesn't vectors, maps nor tuples, but provides the best performance.
+/// it does not support vectors, maps nor tuples, but provides the best performance.
 ///
-/// ## Note
+/// # Note
 /// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
 /// call the `value` method for their keys.
 ///
-/// ## Example
+/// # Example
 /// ```rust
 ///# use std::borrow::Cow;
 /// use serde_querystring::UrlEncodedQS;
@@ -138,7 +138,7 @@ impl<'a> UrlEncodedQS<'a> {
     /// It returns `None` if the **key doesn't exist** in the querystring,
     /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
     ///
-    /// ## Note
+    /// # Note
     /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();

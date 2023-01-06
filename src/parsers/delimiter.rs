@@ -92,11 +92,11 @@ impl<'a> Pair<'a> {
 
 /// A querystring parser with support for vectors/lists of values by the use of a delimiter(ex: `|`).
 ///
-/// ## Note
+/// # Note
 /// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
 /// call the `value` method for their keys.
 ///
-/// ## Example
+/// # Example
 /// ```rust
 ///# use std::borrow::Cow;
 /// use serde_querystring::DelimiterQS;
@@ -157,7 +157,7 @@ impl<'a> DelimiterQS<'a> {
     /// It returns `None` if the **key doesn't exist** in the querystring,
     /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
     ///
-    /// ## Note
+    /// # Note
     /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn values(&self, key: &'a [u8]) -> Option<Option<Vec<Cow<'a, [u8]>>>> {
         let delimiter = self.delimiter;
@@ -176,7 +176,7 @@ impl<'a> DelimiterQS<'a> {
     /// It returns `None` if the **key doesn't exist** in the querystring,
     /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
     ///
-    /// ## Note
+    /// # Note
     /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();

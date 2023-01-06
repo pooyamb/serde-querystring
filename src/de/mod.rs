@@ -90,14 +90,36 @@ where
     }
 }
 
+/// An enum used to choose the parsing method for deserialization
 #[derive(Clone, Copy)]
 pub enum ParseMode {
+    /// The simplest parser for querystring.
+    /// It parses the whole querystring, and overwrites each repeated key’s value.
+    /// It does not support vectors, maps nor tuples, but provides the best performance.
+    ///
+    /// More description at ([UrlEncodedQs](crate::UrlEncodedQS))
     UrlEncoded,
+
+    /// A querystring parser with support for vectors/lists of values by repeating keys.
+    /// (ex. `"key=value1&key=value2"`)
+    ///
+    /// More description at ([DuplicateQs](crate::DuplicateQS))
     Duplicate,
+
+    /// A querystring parser with support for vectors/lists of values by the use of a delimiter byte.
+    /// (ex. `"key=value1|value2|value3"`). Holds the delimiter as a single byte `Delimiter(b'|')`
+    ///
+    /// More description at ([DelimiterQs](crate::DelimiterQS))
     Delimiter(u8),
+
+    /// A querystring parser with support for vectors/lists, maps and enums
+    /// by the use of brackets(like qs or PHP).(ex. `key[2]=value2&key[1]=value1"`)
+    ///
+    /// More description at ([BracketsQs](crate::BracketsQS))
     Brackets,
 }
 
+/// Deserialize an instance of type `T` from bytes of query string.
 pub fn from_bytes<'de, T>(input: &'de [u8], config: ParseMode) -> Result<T, Error>
 where
     T: de::Deserialize<'de>,
@@ -124,6 +146,7 @@ where
     }
 }
 
+/// Deserialize an instance of type `T` from a query string.
 pub fn from_str<'de, T>(input: &'de str, config: ParseMode) -> Result<T, Error>
 where
     T: de::Deserialize<'de>,

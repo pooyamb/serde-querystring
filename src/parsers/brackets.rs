@@ -9,7 +9,7 @@ use crate::decode::{parse_bytes, parse_char, Reference};
 /// Each time the `sub_key` method is called, we move one step forward and return
 /// a new Key.
 ///
-/// ## Example
+/// # Example
 /// For this pair `key[key1][key2]=value`, the first Key would be (`key`, `key1][key2]`).
 /// the first time we call the `sub_key` method we get (`key1`, `key2]`).
 /// and by calling `sub_key` again on the result we get (`key2`, None)
@@ -187,13 +187,13 @@ impl<'a> Pair<'a> {
 /// A querystring parser with support for vectors/lists, maps and enums(for serde)
 /// by the use of brackets(like qs or PHP).
 ///
-/// ## Note
+/// # Note
 /// Keys are decoded when calling the `parse` method, but values are lazily decoded when you
 /// call the `value` method for their keys.
 /// Sub keys/Sub values(The part of the key after bracket opening) is visited when calling the `sub_values`
 /// method, to limit unnecessary allocations and parsing(and stack overflows from too many levels).
 ///
-/// ## Example
+/// # Example
 /// ```rust
 ///# use std::borrow::Cow;
 /// use serde_querystring::BracketsQS;
@@ -291,7 +291,7 @@ impl<'a> BracketsQS<'a> {
     /// It returns None if the **key doesn't exist** in the querystring,
     /// the resulting vector may contain None if the **key had assignments without a value**, ex `&key&`
     ///
-    /// ## Note
+    /// # Note
     /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn values(&self, key: &'a [u8]) -> Option<Vec<Option<Cow<'a, [u8]>>>> {
         let mut scratch = Vec::new();
@@ -311,7 +311,7 @@ impl<'a> BracketsQS<'a> {
     /// It returns `None` if the **key doesn't exist** in the querystring,
     /// and returns `Some(None)` if the last assignment to a **key doesn't have a value**, ex `"&key&"`
     ///
-    /// ## Note
+    /// # Note
     /// Percent decoding the value is done on-the-fly **every time** this function is called.
     pub fn value(&self, key: &'a [u8]) -> Option<Option<Cow<'a, [u8]>>> {
         let mut scratch = Vec::new();
