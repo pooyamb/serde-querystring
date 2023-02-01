@@ -3,13 +3,14 @@ authors = ["Pouya M. B. <pooyamb@gmail.com>"]
 categories = ["encoding", "web-programming"]
 description = "A query string extractor for actix-web based on serde-querystring"
 documentation = "https://docs.rs/serde-querystring-actix"
-edition = "2018"
+edition = "2021"
 keywords = ["serialization", "deserialization", "querystring", "serde", "actix"]
 license = "MIT OR Apache-2.0"
 name = "serde-querystring-actix"
 readme = "README.md"
 repository = "https://github.com/pooyamb/serde-querystring/"
-version = "0.1.0"
+version = "0.2.0"
+rust-version = "1.56"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
