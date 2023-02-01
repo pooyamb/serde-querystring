@@ -21,7 +21,7 @@ async-trait = "0.1"
 http = "0.2"
 
 serde = { version = "1.0.126", features = ["derive"] }
-serde-querystring = { version = "0.1.0", features = ["serde"] }
+serde-querystring = { version = "0.2.0", features = ["serde"] }
 
 [dev-dependencies]
 axum = "0.6"

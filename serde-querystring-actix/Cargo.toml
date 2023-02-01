@@ -18,7 +18,7 @@ actix-web = "^4"
 derive_more = "0.99"
 log = "0.4"
 serde = { version = "1.0.126", features = ["derive"] }
-serde-querystring = { version = "0.1.0", features = ["serde"] }
+serde-querystring = { version = "0.2.0", features = ["serde"] }
 
 [dev-dependencies]
 actix-rt = "^2.7"
