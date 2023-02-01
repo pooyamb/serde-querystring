@@ -30,7 +30,9 @@ serde-querystring = "0.1.0"
 
 You can use the parsers provided in this crate directly, examples are available in each parser's tests.
 
-```rust,ignore
+```rust
+use serde_querystring::DuplicateQS;
+
 let parsed = DuplicateQS::parse(b"foo=bar&foo=baz");
 let values = parsed.values(b"foo"); // Will give you a vector of b"bar" and b"baz"
 ```
@@ -39,7 +41,7 @@ Or you can use serde(with `serde` feature, enabled by default)
 
 ```rust,ignore
 use serde::Deserialize;
-use serde_querystring::{from_str, ParseMode};
+use serde_querystring::{from_str, ParseMode, DuplicateQS};
 
 #[derive(Deserialize)]
 struct MyStruct{
@@ -47,6 +49,8 @@ struct MyStruct{
 }
 
 let parsed: MyStruct = from_str("foo=bar&foo=2022", ParseMode::Duplicate).unwrap();
+// or
+let parsed: MyStruct = DuplicateQS::parse(b"foo=bar&foo=baz").deserialize().unwrap();
 ```
 
 There are also crates for `actix_web`(`serde-querystring-actix`) and `axum`(`serde-querystring-axum`) which provide extractors for their frameworks and can be used without directly relying on the core crate.
