@@ -14,6 +14,6 @@ pub struct AuthRequest {
 
 // In your handler
 async fn index(QueryString(info): QueryString<AuthRequest>) -> String {
-    format!("Authorization request for client with id={} and type={:?}!", info.id, info.response_type)
+    format!("Authorization request for client with id={} and type={:?}!", info.id, info.scopes)
 }
 ```
