@@ -180,14 +180,21 @@ impl<'a> DuplicateQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
+    use _serde::Deserialize;
+
     use crate::de::{
-        Error, ErrorKind,
+        Error, ErrorKind, QSDeserializer,
         __implementors::{DecodedSlice, IntoRawSlices, RawSlice},
     };
 
     use super::DuplicateQS;
 
     impl<'a> DuplicateQS<'a> {
+        /// Deserialize the parsed slice into T
+        pub fn deserialize<T: Deserialize<'a>>(self) -> Result<T, Error> {
+            T::deserialize(QSDeserializer::new(self.into_iter()))
+        }
+
         pub(crate) fn into_iter(
             self,
         ) -> impl Iterator<

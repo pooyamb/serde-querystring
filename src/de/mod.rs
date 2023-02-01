@@ -13,7 +13,7 @@ pub(crate) mod __implementors {
 
 use crate::parsers::{BracketsQS, DelimiterQS, DuplicateQS, UrlEncodedQS};
 
-struct QSDeserializer<I, T> {
+pub(crate) struct QSDeserializer<I, T> {
     iter: I,
     value: Option<T>,
     scratch: Vec<u8>,

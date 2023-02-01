@@ -327,10 +327,10 @@ impl<'a> BracketsQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use _serde::{de, forward_to_deserialize_any, Deserializer};
+    use _serde::{de, forward_to_deserialize_any, Deserialize, Deserializer};
 
     use crate::de::{
-        Error, ErrorKind,
+        Error, ErrorKind, QSDeserializer,
         __implementors::{DecodedSlice, IntoDeserializer, RawSlice},
     };
 
@@ -339,6 +339,11 @@ mod de {
     pub struct Pairs<'a>(Vec<Pair<'a>>);
 
     impl<'a> BracketsQS<'a> {
+        /// Deserialize the parsed slice into T
+        pub fn deserialize<T: Deserialize<'a>>(self) -> Result<T, Error> {
+            T::deserialize(QSDeserializer::new(self.into_iter()))
+        }
+
         pub(crate) fn into_iter(self) -> impl Iterator<Item = (DecodedSlice<'a>, Pairs<'a>)> {
             self.pairs
                 .into_iter()

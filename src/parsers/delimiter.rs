@@ -193,11 +193,21 @@ impl<'a> DelimiterQS<'a> {
 
 #[cfg(feature = "serde")]
 mod de {
-    use crate::de::__implementors::{DecodedSlice, IntoRawSlices, RawSlice};
+    use _serde::Deserialize;
+
+    use crate::de::{
+        Error, QSDeserializer,
+        __implementors::{DecodedSlice, IntoRawSlices, RawSlice},
+    };
 
     use super::DelimiterQS;
 
     impl<'a> DelimiterQS<'a> {
+        /// Deserialize the parsed slice into T
+        pub fn deserialize<T: Deserialize<'a>>(self) -> Result<T, Error> {
+            T::deserialize(QSDeserializer::new(self.into_iter()))
+        }
+
         pub(crate) fn into_iter(
             self,
         ) -> impl Iterator<Item = (DecodedSlice<'a>, SeparatorValues<'a>)> {
