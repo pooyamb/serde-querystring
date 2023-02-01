@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -103,6 +105,23 @@ impl<T> Deref for QueryString<T> {
     }
 }
 
+/// QueryString extractor configuration
+///
+/// ```rust,no_run
+/// use axum::{Router, Extension, http::StatusCode};
+/// use serde_querystring_axum::{ParseMode, QueryStringConfig};
+///
+/// let app = Router::new().layer(Extension(
+///     QueryStringConfig::new(ParseMode::Brackets)
+///     .ehandler(|err| {
+///         (StatusCode::BAD_REQUEST, err.to_string()) // return type should impl IntoResponse
+///     }),
+/// ));
+/// # async {
+/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # };
+/// ```
+///
 #[derive(Clone)]
 pub struct QueryStringConfig {
     mode: ParseMode,

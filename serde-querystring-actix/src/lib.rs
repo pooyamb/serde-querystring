@@ -1,4 +1,4 @@
-//! Query extractor based on serde-querystring
+#![doc = include_str!("../README.md")]
 
 use std::future::{ready, Ready};
 use std::sync::Arc;
@@ -16,7 +16,7 @@ pub use serde_querystring::de::ParseMode;
 ///
 /// [**QueryStringConfig**](struct.QueryStringConfig.html) allows to configure extraction process.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// use actix_web::{web, App};
@@ -91,41 +91,6 @@ impl<T: fmt::Display> fmt::Display for QueryString<T> {
     }
 }
 
-/// Actix-web's web::Query modified to work with serde-querystring
-///
-/// ## Example
-///
-/// ```rust
-/// use actix_web::{web, App};
-/// use serde::Deserialize;
-/// use serde_querystring_actix::QueryString;
-///
-/// #[derive(Debug, Deserialize)]
-/// pub enum ResponseType {
-///    Token,
-///    Code
-/// }
-///
-/// #[derive(Deserialize)]
-/// pub struct AuthRequest {
-///    id: u64,
-///    response_type: ResponseType,
-/// }
-///
-/// // Use `QueryString` extractor for query information.
-/// // This handler get called only if request's query contains `username` field
-/// // The correct request for this handler would be `/index.html?id=64&response_type=Code"`
-/// // For more example visit the serde-querystring crate itself.
-/// async fn index(info: QueryString<AuthRequest>) -> String {
-///     format!("Authorization request for client with id={} and type={:?}!", info.id, info.response_type)
-/// }
-///
-/// fn main() {
-///     let app = App::new().service(
-///        web::resource("/index.html")
-///            .route(web::get().to(index))); // <- use `Query` extractor
-/// }
-/// ```
 impl<T> FromRequest for QueryString<T>
 where
     T: de::DeserializeOwned,
@@ -164,7 +129,7 @@ where
 
 /// QueryString extractor configuration
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// use actix_web::{error, web, App, FromRequest, HttpResponse};
