@@ -53,14 +53,11 @@ pub use serde_querystring::de::ParseMode;
 ///
 /// ```rust,no_run
 /// use axum::{Router, Extension, http::StatusCode};
-/// use serde_querystring_axum::{ParseMode, QueryStringConfig, QueryStringError};
+/// use serde_querystring_axum::{ParseMode, QueryStringConfig};
 ///
 /// let app = Router::new().layer(Extension(
-///     QueryStringConfig::new().ehandler(|_err| {
-///         QueryStringError::new(
-///             StatusCode::BAD_GATEWAY,
-///             String::from("Something went wrong"),
-///         )
+///     QueryStringConfig::new(ParseMode::Brackets).ehandler(|err| {
+///         (StatusCode::BAD_REQUEST, err.to_string()) // return type should impl IntoResponse
 ///     }),
 /// ));
 /// # async {
@@ -77,7 +74,7 @@ where
     T: DeserializeOwned,
     S: Send + Sync,
 {
-    type Rejection = QueryStringError;
+    type Rejection = Response;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let QueryStringConfig { mode, ehandler } = parts
@@ -91,7 +88,7 @@ where
             if let Some(ehandler) = ehandler {
                 ehandler(e)
             } else {
-                QueryStringError::default()
+                QueryStringError::default().into_response()
             }
         })?;
         Ok(QueryString(value))
@@ -109,7 +106,7 @@ impl<T> Deref for QueryString<T> {
 #[derive(Clone)]
 pub struct QueryStringConfig {
     mode: ParseMode,
-    ehandler: Option<Arc<dyn Fn(Error) -> QueryStringError + Send + Sync>>,
+    ehandler: Option<Arc<dyn Fn(Error) -> Response + Send + Sync>>,
 }
 
 impl Default for QueryStringConfig {
@@ -122,8 +119,11 @@ impl Default for QueryStringConfig {
 }
 
 impl QueryStringConfig {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(mode: ParseMode) -> Self {
+        Self {
+            mode,
+            ehandler: None,
+        }
     }
 
     pub fn mode(mut self, mode: ParseMode) -> Self {
@@ -131,17 +131,18 @@ impl QueryStringConfig {
         self
     }
 
-    pub fn ehandler<F>(mut self, ehandler: F) -> Self
+    pub fn ehandler<F, R>(mut self, ehandler: F) -> Self
     where
-        F: Fn(Error) -> QueryStringError + Send + Sync + 'static,
+        F: Fn(Error) -> R + Send + Sync + 'static,
+        R: IntoResponse,
     {
-        self.ehandler = Some(Arc::new(ehandler));
+        self.ehandler = Some(Arc::new(move |e| ehandler(e).into_response()));
         self
     }
 }
 
 #[derive(Debug)]
-pub struct QueryStringError {
+struct QueryStringError {
     status: StatusCode,
     body: String,
 }
@@ -152,12 +153,6 @@ impl Default for QueryStringError {
             status: StatusCode::BAD_REQUEST,
             body: String::from("Failed to deserialize query string"),
         }
-    }
-}
-
-impl QueryStringError {
-    pub fn new(status: StatusCode, body: String) -> Self {
-        Self { status, body }
     }
 }
 
@@ -251,9 +246,9 @@ mod tests {
             format!("{}-{}", q.n.get(0).unwrap(), q.n.get(2).unwrap())
         }
 
-        let app = Router::new().route("/", get(handler)).layer(Extension(
-            QueryStringConfig::default().mode(ParseMode::Brackets),
-        ));
+        let app = Router::new()
+            .route("/", get(handler))
+            .layer(Extension(QueryStringConfig::new(ParseMode::Brackets)));
         let res = app
             .oneshot(
                 Request::builder()
@@ -311,8 +306,8 @@ mod tests {
         async fn handler(_: QueryString<Params>) {}
 
         let app = Router::new().route("/", get(handler)).layer(Extension(
-            QueryStringConfig::new().ehandler(|_err| {
-                QueryStringError::new(
+            QueryStringConfig::default().ehandler(|_err| {
+                (
                     StatusCode::BAD_GATEWAY,
                     String::from("Something went wrong"),
                 )
