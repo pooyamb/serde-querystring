@@ -39,7 +39,7 @@ struct Values<'a>(&'a [u8]);
 
 impl<'a> Values<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
-        if *slice.get(0)? == b'&' {
+        if *slice.first()? == b'&' {
             return None;
         }
 
@@ -59,9 +59,7 @@ impl<'a> Values<'a> {
     }
 
     fn values(&self, delimiter: u8) -> impl Iterator<Item = Value<'a>> {
-        self.0
-            .split(move |c| *c == delimiter)
-            .map(|slice| Value(slice))
+        self.0.split(move |c| *c == delimiter).map(Value)
     }
 
     fn decode_to<'s>(&self, scratch: &'s mut Vec<u8>) -> Reference<'a, 's, [u8]> {

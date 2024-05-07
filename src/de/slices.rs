@@ -10,11 +10,11 @@ use crate::decode::Reference;
 use super::{Error, ErrorKind};
 
 pub trait Value<'de> {
-    fn parse_number<'s, T>(&self, scratch: &'s mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical;
 
-    fn parse_bool<'s>(&self, scratch: &'s mut Vec<u8>) -> Result<bool, Error>;
+    fn parse_bool(&self, scratch: &mut Vec<u8>) -> Result<bool, Error>;
 
     fn parse_bytes<'s>(self, scratch: &'s mut Vec<u8>) -> Reference<'de, 's, [u8]>;
     fn parse_str<'s>(self, scratch: &'s mut Vec<u8>) -> Result<Reference<'de, 's, str>, Error>;
@@ -42,7 +42,7 @@ impl<'de> fmt::Display for DecodedSlice<'de> {
 }
 
 impl<'de> Value<'de> for DecodedSlice<'de> {
-    fn parse_number<'s, T>(&self, _: &'s mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical,
     {
@@ -53,7 +53,7 @@ impl<'de> Value<'de> for DecodedSlice<'de> {
         })
     }
 
-    fn parse_bool<'s>(&self, _: &'s mut Vec<u8>) -> Result<bool, Error> {
+    fn parse_bool(&self, _: &mut Vec<u8>) -> Result<bool, Error> {
         match self.0.len() {
             0 => Ok(true),
             1 => match self.0[0] {
@@ -110,7 +110,7 @@ impl<'de> fmt::Display for RawSlice<'de> {
 }
 
 impl<'de> Value<'de> for RawSlice<'de> {
-    fn parse_number<'s, T>(&self, _: &'s mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical,
     {
@@ -121,7 +121,7 @@ impl<'de> Value<'de> for RawSlice<'de> {
         })
     }
 
-    fn parse_bool<'s>(&self, _: &'s mut Vec<u8>) -> Result<bool, Error> {
+    fn parse_bool(&self, _: &mut Vec<u8>) -> Result<bool, Error> {
         match self.0.len() {
             0 => Ok(true),
             1 => match self.0[0] {
@@ -162,14 +162,14 @@ impl<'de> Value<'de> for RawSlice<'de> {
 }
 
 impl<'de> Value<'de> for Option<RawSlice<'de>> {
-    fn parse_number<'s, T>(&self, scratch: &'s mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
     where
         T: FromLexical,
     {
         self.unwrap_or_default().parse_number(scratch)
     }
 
-    fn parse_bool<'s>(&self, scratch: &'s mut Vec<u8>) -> Result<bool, Error> {
+    fn parse_bool(&self, scratch: &mut Vec<u8>) -> Result<bool, Error> {
         self.unwrap_or_default().parse_bool(scratch)
     }
 

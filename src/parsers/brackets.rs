@@ -113,7 +113,7 @@ impl<'a> Key<'a> {
                         _ => index += 1,
                     }
                 }
-                return false;
+                false
             }
             None => false,
         }
@@ -136,7 +136,7 @@ struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> (Option<Self>, usize) {
-        match slice.get(0) {
+        match slice.first() {
             Some(b'&') | None => {
                 return (None, 0);
             }
@@ -169,7 +169,7 @@ struct Pair<'a>(Key<'a>, Option<Value<'a>>);
 impl<'a> Pair<'a> {
     /// Parses a pair of key-value and return a `Pair` and a skip len
     ///
-    /// Unlike other parser methods, we directly return the skip_len here
+    /// Unlike other parser methods, we directly return the `skip_len` here
     /// since there are many exceptions to take into account in this method
     /// and it helps avoid some recalculations.
     fn parse(slice: &'a [u8]) -> (Self, usize) {
@@ -281,7 +281,7 @@ impl<'a> BracketsQS<'a> {
         self.pairs.keys().collect()
     }
 
-    /// Parses all the subkeys for this key and optionally returns a new 'BracketsQS' if the key exists
+    /// Parses all the subkeys for this key and optionally returns a new `BracketsQS` if the key exists
     pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQS> {
         Some(Self::from_pairs(self.pairs.get(key)?.iter().copied()))
     }
@@ -491,9 +491,9 @@ mod de {
         where
             V: de::Visitor<'de>,
         {
-            if self.0.is_empty() {
-                visitor.visit_none()
-            } else if self.0.len() == 1 && !self.0[0].0.has_subkey() && self.0[0].1.is_none() {
+            if self.0.is_empty()
+                || (self.0.len() == 1 && !self.0[0].0.has_subkey() && self.0[0].1.is_none())
+            {
                 visitor.visit_none()
             } else {
                 visitor.visit_some(self)
@@ -524,23 +524,20 @@ mod de {
             V: de::DeserializeSeed<'de>,
         {
             let last_pair = self.0.last().expect("Values iterator can't be empty");
-            match last_pair.0.subkey() {
-                Some(subkey) => {
-                    let mut scratch = self.1;
-                    let pairs = BracketsQS::from_pairs(self.0.into_iter())
-                        .pairs
-                        .remove(subkey.0)
-                        .unwrap();
-                    seed.deserialize(RawSlice(subkey.0).into_deserializer(&mut scratch))
-                        .map(move |v| (v, Self(pairs, scratch)))
-                }
-                None => {
-                    let mut scratch = self.1;
-                    seed.deserialize(
-                        RawSlice(last_pair.1.unwrap_or_default().0).into_deserializer(&mut scratch),
-                    )
-                    .map(move |v| (v, PairsDeserializer(Vec::new(), scratch)))
-                }
+            if let Some(subkey) = last_pair.0.subkey() {
+                let scratch = self.1;
+                let pairs = BracketsQS::from_pairs(self.0.into_iter())
+                    .pairs
+                    .remove(subkey.0)
+                    .unwrap();
+                seed.deserialize(RawSlice(subkey.0).into_deserializer(scratch))
+                    .map(move |v| (v, Self(pairs, scratch)))
+            } else {
+                let scratch = self.1;
+                seed.deserialize(
+                    RawSlice(last_pair.1.unwrap_or_default().0).into_deserializer(scratch),
+                )
+                .map(move |v| (v, PairsDeserializer(Vec::new(), scratch)))
             }
         }
     }
@@ -549,7 +546,7 @@ mod de {
         type Error = Error;
 
         fn unit_variant(self) -> Result<(), Self::Error> {
-            if self.0.len() == 0 {
+            if self.0.is_empty() {
                 Ok(())
             } else {
                 Err(Error::new(ErrorKind::Other)

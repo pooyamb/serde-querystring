@@ -30,7 +30,7 @@ struct Value<'a>(&'a [u8]);
 
 impl<'a> Value<'a> {
     fn parse(slice: &'a [u8]) -> Option<Self> {
-        if *slice.get(0)? == b'&' {
+        if *slice.first()? == b'&' {
             return None;
         }
 
