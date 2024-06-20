@@ -1,7 +1,8 @@
-use std::str;
+use std::ops::{AddAssign, MulAssign, SubAssign};
 
 use _serde::{de, forward_to_deserialize_any};
-use lexical::{self, FromLexical};
+use atoi::MaxNumDigits;
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, One, Zero};
 
 use crate::decode::Reference;
 
@@ -46,9 +47,7 @@ impl<'de, 's> IntoDeserializer<'de, 's> for Option<RawSlice<'de>> {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ValueDeserializer<'s, T>(T, &'s mut Vec<u8>);
-
-macro_rules! deserialize_number {
+macro_rules! deserialize_int {
     ($($method:ident => $visit:ident) *) => {
         $(
             #[inline]
@@ -56,10 +55,57 @@ macro_rules! deserialize_number {
             where
                 V: de::Visitor<'de>,
             {
-                visitor.$visit(self.0.parse_number(self.1)?)
+                visitor.$visit(self.parse_int()?)
             }
         )*
     };
+}
+
+macro_rules! deserialize_float {
+    ($($method:ident => $visit:ident) *) => {
+        $(
+            #[inline]
+            fn $method<V>(self, visitor: V) -> Result<V::Value,Error>
+            where
+                V: de::Visitor<'de>,
+            {
+                visitor.$visit(self.parse_float()?)
+            }
+        )*
+    };
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ValueDeserializer<'s, T>(T, &'s mut Vec<u8>);
+
+impl<'de, 's, T> ValueDeserializer<'s, T>
+where
+    T: Value<'de>,
+{
+    #[inline(always)]
+    fn parse_int<U>(self) -> Result<U, Error>
+    where
+        U: Zero
+            + One
+            + AddAssign
+            + MulAssign
+            + SubAssign
+            + CheckedAdd
+            + CheckedSub
+            + CheckedMul
+            + MaxNumDigits,
+    {
+        self.0.parse_int(self.1)
+    }
+
+    #[inline(always)]
+    fn parse_float<U>(self) -> Result<U, Error>
+    where
+        U: std::str::FromStr,
+    {
+        self.0.parse_float(self.1)
+    }
 }
 
 impl<'de, 's, T> de::Deserializer<'de> for ValueDeserializer<'s, T>
@@ -163,7 +209,7 @@ where
         tuple seq tuple_struct
     }
 
-    deserialize_number!(
+    deserialize_int!(
         deserialize_i8 => visit_i8
         deserialize_i16 => visit_i16
         deserialize_i32 => visit_i32
@@ -173,7 +219,9 @@ where
         deserialize_u16 => visit_u16
         deserialize_u32 => visit_u32
         deserialize_u64 => visit_u64
+    );
 
+    deserialize_float!(
         deserialize_f32 => visit_f32
         deserialize_f64 => visit_f64
     );
@@ -222,31 +270,32 @@ impl<'de, 's, I> IterDeserializer<'s, I>
 where
     I: 'de + IntoRawSlices<'de>,
 {
-    fn parse_number<T>(self) -> Result<T, Error>
+    fn parse_int<T>(self) -> Result<T, Error>
     where
-        T: FromLexical,
+        T: Zero
+            + One
+            + AddAssign
+            + MulAssign
+            + SubAssign
+            + CheckedAdd
+            + CheckedSub
+            + CheckedMul
+            + MaxNumDigits,
     {
-        self.0.into_single_slice().parse_number(self.1)
+        self.0.into_single_slice().parse_int(self.1)
+    }
+
+    fn parse_float<T>(self) -> Result<T, Error>
+    where
+        T: std::str::FromStr,
+    {
+        self.0.into_single_slice().parse_float(self.1)
     }
 
     #[inline]
     fn into_slice_deserializer(self) -> ValueDeserializer<'s, RawSlice<'de>> {
         ValueDeserializer(self.0.into_single_slice(), self.1)
     }
-}
-
-macro_rules! deserialize_number {
-    ($($method:ident => $visit:ident) *) => {
-        $(
-            #[inline]
-            fn $method<V>(self, visitor: V) -> Result<V::Value,Error>
-            where
-                V: de::Visitor<'de>,
-            {
-                visitor.$visit(self.parse_number()?)
-            }
-        )*
-    };
 }
 
 impl<'de, 's, I> de::Deserializer<'de> for IterDeserializer<'s, I>
@@ -366,7 +415,7 @@ where
         char str string unit unit_struct map struct identifier
     }
 
-    deserialize_number!(
+    deserialize_int!(
         deserialize_i8 => visit_i8
         deserialize_i16 => visit_i16
         deserialize_i32 => visit_i32
@@ -376,7 +425,9 @@ where
         deserialize_u16 => visit_u16
         deserialize_u32 => visit_u32
         deserialize_u64 => visit_u64
+    );
 
+    deserialize_float!(
         deserialize_f32 => visit_f32
         deserialize_f64 => visit_f64
     );

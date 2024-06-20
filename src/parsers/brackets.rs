@@ -328,6 +328,7 @@ impl<'a> BracketsQS<'a> {
 #[cfg(feature = "serde")]
 mod de {
     use _serde::{de, forward_to_deserialize_any, Deserialize, Deserializer};
+    use atoi::FromRadix10Checked;
 
     use crate::de::{
         Error, ErrorKind, QSDeserializer,
@@ -368,11 +369,16 @@ mod de {
                 .into_iter()
                 .map(|pair| {
                     let index = match pair.0.subkey() {
-                        Some(subkey) if !subkey.is_empty() => lexical::parse::<usize, _>(subkey.0)
-                            .map_err(|e| {
-                                Error::new(ErrorKind::InvalidNumber)
-                                    .message(format!("invalid index: {}", e))
-                            })?,
+                        Some(subkey) if !subkey.is_empty() => {
+                            let (value, len) = usize::from_radix_10_checked(&subkey.0);
+                            value
+                                .and_then(|v| if len == subkey.0.len() { Some(v) } else { None })
+                                .ok_or_else(|| {
+                                    Error::new(ErrorKind::InvalidNumber).message(format!(
+                                        "invalid index: the key has non-numeric characters"
+                                    ))
+                                })?
+                        }
                         _ => 0,
                     };
                     Ok((index, RawSlice(pair.1.unwrap_or_default().slice())))
