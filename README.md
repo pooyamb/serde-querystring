@@ -23,7 +23,7 @@ A query string parser for rust with support for different parsing methods.
 ```toml
 # Cargo.toml
 [dependencies]
-serde-querystring = "0.2.0"
+serde-querystring = "0.3.0-beta.0"
 ```
 
 ## Usage

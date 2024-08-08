@@ -15,7 +15,7 @@ license = "MIT OR Apache-2.0"
 name = "serde-querystring"
 readme = "README.md"
 repository = "https://github.com/pooyamb/serde-querystring/"
-version = "0.2.1"
+version = "0.3.0-beta.0"
 rust-version = "1.56"
 
 [dependencies]
