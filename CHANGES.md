@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed the unmaintained `lexical` from dependencies
 - Switched to `atoi` for parsing integers and `std` for parsing floats
 - General code improvements and pipeline fix
-- Updated `derive_more` to v1 for `serde-querystring-actix`
+- Updated `derive_more` to v1 for `serde-querystring-actix` (reverted due to MSRV)
 
 ## [0.2.1] - 2023-03-06
 
