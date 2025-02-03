@@ -1,11 +1,8 @@
 use std::borrow::Cow;
 use std::fmt;
-use std::ops::{AddAssign, MulAssign, SubAssign};
 use std::str;
 
-use atoi::FromRadix10SignedChecked;
-use atoi::MaxNumDigits;
-use num_traits::{CheckedAdd, CheckedMul, CheckedSub, One, Zero};
+use lexical::FromLexical;
 
 use crate::decode::parse_bytes;
 use crate::decode::Reference;
@@ -13,21 +10,9 @@ use crate::decode::Reference;
 use super::{Error, ErrorKind};
 
 pub trait Value<'de> {
-    fn parse_int<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
     where
-        T: Zero
-            + One
-            + AddAssign
-            + MulAssign
-            + SubAssign
-            + CheckedAdd
-            + CheckedSub
-            + CheckedMul
-            + MaxNumDigits;
-
-    fn parse_float<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
-    where
-        T: str::FromStr;
+        T: FromLexical;
 
     fn parse_bool(&self, scratch: &mut Vec<u8>) -> Result<bool, Error>;
 
@@ -57,52 +42,15 @@ impl<'de> fmt::Display for DecodedSlice<'de> {
 }
 
 impl<'de> Value<'de> for DecodedSlice<'de> {
-    fn parse_int<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
     where
-        T: Zero
-            + One
-            + AddAssign
-            + MulAssign
-            + SubAssign
-            + CheckedAdd
-            + CheckedSub
-            + CheckedMul
-            + MaxNumDigits,
+        T: FromLexical,
     {
-        if self.0.len() == 0 {
-            return Err(Error::new(ErrorKind::InvalidNumber)
+        lexical::parse(&self.0).map_err(|e| {
+            Error::new(ErrorKind::InvalidNumber)
                 .value(&self.0)
-                .message(format!("invalid index: the key has no value")));
-        }
-
-        let (value, len) = T::from_radix_10_signed_checked(&self.0);
-        value
-            .and_then(|v| if len == self.0.len() { Some(v) } else { None })
-            .ok_or_else(|| {
-                Error::new(ErrorKind::InvalidNumber)
-                    .value(&self.0)
-                    .message(format!("invalid index: the key has non-numeric characters"))
-            })
-    }
-
-    fn parse_float<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
-    where
-        T: str::FromStr,
-    {
-        // TODO: Maybe just check is_ascii and use the unsafe version
-        str::from_utf8(&self.0)
-            .map_err(|_err| {
-                Error::new(ErrorKind::InvalidNumber)
-                    .value(&self.0)
-                    .message("invalid index: the key has invalid characters".to_owned())
-            })
-            .and_then(|v| {
-                v.parse().map_err(|_err| {
-                    Error::new(ErrorKind::InvalidNumber)
-                        .value(&self.0)
-                        .message("invalid index: the key has non-numeric characters".to_owned())
-                })
-            })
+                .message(e.to_string())
+        })
     }
 
     fn parse_bool(&self, _: &mut Vec<u8>) -> Result<bool, Error> {
@@ -162,52 +110,15 @@ impl<'de> fmt::Display for RawSlice<'de> {
 }
 
 impl<'de> Value<'de> for RawSlice<'de> {
-    fn parse_int<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
     where
-        T: Zero
-            + One
-            + AddAssign
-            + MulAssign
-            + SubAssign
-            + CheckedAdd
-            + CheckedSub
-            + CheckedMul
-            + MaxNumDigits,
+        T: FromLexical,
     {
-        if self.0.len() == 0 {
-            return Err(Error::new(ErrorKind::InvalidNumber)
-                .value(&self.0)
-                .message(format!("invalid index: the key has no value")));
-        }
-
-        let (value, len) = T::from_radix_10_signed_checked(&self.0);
-        value
-            .and_then(|v| if len == self.0.len() { Some(v) } else { None })
-            .ok_or_else(|| {
-                Error::new(ErrorKind::InvalidNumber)
-                    .value(self.0)
-                    .message(format!("invalid index: the key has non-numeric characters"))
-            })
-    }
-
-    fn parse_float<T>(&self, _: &mut Vec<u8>) -> Result<T, Error>
-    where
-        T: str::FromStr,
-    {
-        // TODO: Maybe just check is_ascii and use the unsafe version
-        str::from_utf8(&self.0)
-            .map_err(|_err| {
-                Error::new(ErrorKind::InvalidNumber)
-                    .value(&self.0)
-                    .message("invalid index: the key has invalid characters".to_owned())
-            })
-            .and_then(|v| {
-                v.parse().map_err(|_err| {
-                    Error::new(ErrorKind::InvalidNumber)
-                        .value(&self.0)
-                        .message("invalid index: the key has non-numeric characters".to_owned())
-                })
-            })
+        lexical::parse(self.0).map_err(|e| {
+            Error::new(ErrorKind::InvalidNumber)
+                .value(self.0)
+                .message(e.to_string())
+        })
     }
 
     fn parse_bool(&self, _: &mut Vec<u8>) -> Result<bool, Error> {
@@ -251,26 +162,11 @@ impl<'de> Value<'de> for RawSlice<'de> {
 }
 
 impl<'de> Value<'de> for Option<RawSlice<'de>> {
-    fn parse_int<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
+    fn parse_number<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
     where
-        T: Zero
-            + One
-            + AddAssign
-            + MulAssign
-            + SubAssign
-            + CheckedAdd
-            + CheckedSub
-            + CheckedMul
-            + MaxNumDigits,
+        T: FromLexical,
     {
-        self.unwrap_or_default().parse_int(scratch)
-    }
-
-    fn parse_float<T>(&self, scratch: &mut Vec<u8>) -> Result<T, Error>
-    where
-        T: str::FromStr,
-    {
-        self.unwrap_or_default().parse_float(scratch)
+        self.unwrap_or_default().parse_number(scratch)
     }
 
     fn parse_bool(&self, scratch: &mut Vec<u8>) -> Result<bool, Error> {
