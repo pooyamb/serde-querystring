@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.3.0]
 
--
+### Changed
+
+- Switched back from `atoi` and `std` to `lexcial` because it has fixed its soundness issues.
 
 ## [0.3.0-beta.0] - 2024-08-08
 
