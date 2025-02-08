@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 name = "serde-querystring-axum"
 readme = "README.md"
 repository = "https://github.com/pooyamb/serde-querystring/"
-version = "0.3.0-beta.0"
+version = "0.3.0"
 rust-version = "1.56"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,7 +21,7 @@ async-trait = "0.1"
 http = "0.2"
 
 serde = { version = "1.0.126", features = ["derive"] }
-serde-querystring = { version = "0.3.0-beta.0", features = ["serde"] }
+serde-querystring = { version = "0.3.0", features = ["serde"] }
 
 [dev-dependencies]
 axum = "0.6"
