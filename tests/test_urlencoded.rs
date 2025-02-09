@@ -92,6 +92,7 @@ fn deserialize_error_type() {
     // We don't support non-unit enums
     #[derive(Debug, Deserialize)]
     #[serde(crate = "_serde")]
+    #[allow(dead_code)]
     enum ValueEnum {
         A(i32, i32),
         B(i32),
