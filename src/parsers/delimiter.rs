@@ -194,8 +194,8 @@ mod de {
     use _serde::Deserialize;
 
     use crate::de::{
-        Error, QSDeserializer,
         __implementors::{DecodedSlice, IntoRawSlices, RawSlice},
+        Error, QSDeserializer,
     };
 
     use super::DelimiterQS;

@@ -183,8 +183,8 @@ mod de {
     use _serde::Deserialize;
 
     use crate::de::{
-        Error, ErrorKind, QSDeserializer,
         __implementors::{DecodedSlice, IntoRawSlices, RawSlice},
+        Error, ErrorKind, QSDeserializer,
     };
 
     use super::DuplicateQS;

@@ -282,7 +282,7 @@ impl<'a> BracketsQS<'a> {
     }
 
     /// Parses all the subkeys for this key and optionally returns a new `BracketsQS` if the key exists
-    pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQS> {
+    pub fn sub_values(&self, key: &'a [u8]) -> Option<BracketsQS<'_>> {
         Some(Self::from_pairs(self.pairs.get(key)?.iter().copied()))
     }
 
@@ -330,8 +330,8 @@ mod de {
     use _serde::{de, forward_to_deserialize_any, Deserialize, Deserializer};
 
     use crate::de::{
-        Error, ErrorKind, QSDeserializer,
         __implementors::{DecodedSlice, IntoDeserializer, RawSlice},
+        Error, ErrorKind, QSDeserializer,
     };
 
     use super::{BracketsQS, Pair};
