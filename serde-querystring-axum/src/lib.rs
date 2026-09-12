@@ -3,7 +3,6 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum_core::{
     extract::FromRequestParts,
     response::{IntoResponse, Response},
@@ -44,7 +43,7 @@ pub use serde_querystring::de::ParseMode;
 ///
 /// let app = Router::new().route("/list_things", get(list_things));
 /// # async {
-/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # let _: Router = app;
 /// # };
 /// ```
 ///
@@ -63,14 +62,13 @@ pub use serde_querystring::de::ParseMode;
 ///     }),
 /// ));
 /// # async {
-/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # let _: Router = app;
 /// # };
 /// ```
 ///
 #[derive(Debug, Clone, Copy, Default)]
 pub struct QueryString<T>(pub T);
 
-#[async_trait]
 impl<T, S> FromRequestParts<S> for QueryString<T>
 where
     T: DeserializeOwned,
@@ -118,7 +116,7 @@ impl<T> Deref for QueryString<T> {
 ///     }),
 /// ));
 /// # async {
-/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # let _: Router = app;
 /// # };
 /// ```
 ///
@@ -185,13 +183,9 @@ impl IntoResponse for QueryStringError {
 mod tests {
     use std::fmt::Debug;
 
-    use axum::{
-        body::{Body, HttpBody},
-        extract::FromRequest,
-        routing::get,
-        Extension, Router,
-    };
+    use axum::{body::Body, extract::FromRequest, routing::get, Extension, Router};
     use http::{Request, StatusCode};
+    use http_body_util::BodyExt;
     use serde::Deserialize;
     use tower::ServiceExt;
 
@@ -201,7 +195,10 @@ mod tests {
     where
         T: DeserializeOwned + PartialEq + Debug,
     {
-        let req = Request::builder().uri(uri.as_ref()).body(()).unwrap();
+        let req = Request::builder()
+            .uri(uri.as_ref())
+            .body(Body::empty())
+            .unwrap();
         assert_eq!(
             QueryString::<T>::from_request(req, &()).await.unwrap().0,
             value
@@ -281,7 +278,10 @@ mod tests {
         let (parts, mut body) = res.into_parts();
 
         assert_eq!(parts.status, StatusCode::OK);
-        assert_eq!(body.data().await.unwrap().unwrap(), "100-300")
+        assert_eq!(
+            body.frame().await.unwrap().unwrap().into_data().unwrap(),
+            "100-300"
+        )
     }
 
     #[tokio::test]
@@ -309,7 +309,7 @@ mod tests {
 
         assert_eq!(parts.status, StatusCode::BAD_REQUEST);
         assert_eq!(
-            body.data().await.unwrap().unwrap(),
+            body.frame().await.unwrap().unwrap().into_data().unwrap(),
             "Failed to deserialize query string"
         );
     }
@@ -346,6 +346,9 @@ mod tests {
         let (parts, mut body) = res.into_parts();
 
         assert_eq!(parts.status, StatusCode::BAD_GATEWAY);
-        assert_eq!(body.data().await.unwrap().unwrap(), "Something went wrong");
+        assert_eq!(
+            body.frame().await.unwrap().unwrap().into_data().unwrap(),
+            "Something went wrong"
+        );
     }
 }

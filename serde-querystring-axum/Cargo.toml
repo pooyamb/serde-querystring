@@ -15,15 +15,14 @@ rust-version = "1.56"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum-core = "0.3.0"
-
-async-trait = "0.1"
-http = "0.2"
+axum-core = "0.5.0"
+http = "1.5"
 
 serde = { version = "1.0.126", features = ["derive"] }
 serde-querystring = { version = "0.3.0", features = ["serde"] }
 
 [dev-dependencies]
-axum = "0.6"
-tokio = { version = "1.23", features = ["full"] }
-tower = "0.4"
+axum = "0.8"
+http-body-util = "0.1"
+tokio = { version = "1.53", features = ["full"] }
+tower = "0.5"
