@@ -196,7 +196,7 @@ impl Default for QueryStringConfig {
 #[derive(Debug, Display, From)]
 pub enum QueryStringPayloadError {
     /// Deserialize error
-    #[display(fmt = "Query deserialize error: {}", _0)]
+    #[display("Query deserialize error: {}", _0)]
     Deserialize(serde_querystring::de::Error),
 }
 
